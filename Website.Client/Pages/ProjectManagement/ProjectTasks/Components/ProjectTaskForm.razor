@@ -1,0 +1,156 @@
+@using BlazorBootstrap
+@using DataContext
+@using DataModel.Enums
+
+<Card>
+    <CardBody>
+        <div class="row">
+            <div class="col-3">n° Ticket</div>
+            <div class="col-3">CECO</div>
+            <div class="col-3">Cliente</div>
+            <div class="col-3">Tipo de imputación <span class="text-muted small">(Opcional)</span></div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-3">
+                <InputText class="form-control" @bind-Value="@Task.KanbanId" maxlength="8" />
+            </div>
+
+            <div class="col-3">
+                <InputSelect class="form-select" @bind-Value="Task.ProjectId" disabled="@IsProjectDisabled" @oninput="OnProjectChange">
+                    <option selected value=-1 disabled>Seleccione</option>
+                    @foreach (var p in Projects)
+                    {
+                        <option value=@p.Id>@p.Name</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-3">
+                <InputSelect class="form-select" @bind-Value="Task.ClientId" disabled="@IsClientDisabled" @oninput="OnClientChange">
+                    <option selected value=-1 disabled>Seleccione</option>
+                    @foreach (var p in Clients)
+                    {
+                        <option value=@p.Id>@p.Name</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-3">
+                <InputSelect class="form-select" @bind-Value="Task.TaskTypeId">
+                    <option selected value=-1 disabled>Seleccione</option>
+                    @foreach (var p in TaskTypes)
+                    {
+                        <option value=@p.Id>@p.Name</option>
+                    }
+                </InputSelect>
+            </div>
+        </div>
+
+        <div class="row mt-2">
+            <div class="col-12">Nombre</div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-12">
+                <InputText class="form-control" @bind-Value="@Task.Name" />
+            </div>
+        </div>
+
+        <div class="row mt-2">
+            <div class="col-3">Inicio</div>
+            <div class="col-3">Fin</div>
+            <div class="col-3">Entrega</div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-3">
+                <InputDate Class="form-control" @bind-Value="Task.InitDate"></InputDate>
+            </div>
+            <div class="col-3">
+                <InputDate Class="form-control" @bind-Value="Task.EndDate"></InputDate>
+            </div>
+            <div class="col-3">
+                <InputDate Class="form-control" @bind-Value="Task.DeliverDate"></InputDate>
+            </div>
+        </div>
+
+        <div class="row mt-2">
+            <div class="col-12">Descripción</div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-12">
+                <textarea Class="form-control" @bind="@Task.Description" rows="3"></textarea>
+            </div>
+        </div>
+
+        @if (Task.TaskTypeId > 0)
+        {
+            <div class="row">
+                <div class="col-12">
+                    <input type="text" class="form-control" style="background-color: var(--l-lightred) !important; border-color: var(--l-red) !important; color: var(--l-darkred) !important; text-align: center" disabled value="Al seleccionar tipo de imputación, bloqueará la carga a sólo tareas del tipo @TaskTypes.First(x => x.Id == Task.TaskTypeId).Name" />
+                </div>
+            </div>
+            <br />
+        }
+
+        <div class="row mt-2">
+            <div class="col-6"></div>
+            <div class="col-6">
+                <div class="row">
+                    <div class="col-6"></div>
+                    <div class="col-3">
+                        <Button Class="btn btn-secondary form-control" @onclick="OnCancel">Limpiar</Button>
+                    </div>
+                    <div class="col-3">
+                        <Button Class="btn btn-primary form-control" @onclick="OnSave">@(IsEdit ? "Guardar" : "Crear")</Button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </CardBody>
+</Card>
+
+@code {
+    [Parameter] public ProjectTask Task { get; set; } = new ProjectTask();
+    [Parameter] public List<Project> Projects { get; set; } = new();
+    [Parameter] public List<Client> Clients { get; set; } = new();
+    [Parameter] public List<TaskType> TaskTypes { get; set; } = new();
+    [Parameter] public bool IsEdit { get; set; } = false;
+    [Parameter] public bool IsProjectDisabled { get; set; } = false;
+    [Parameter] public bool IsClientDisabled { get; set; } = false;
+    
+    [Parameter] public EventCallback<ProjectTask> OnSaveTask { get; set; }
+    [Parameter] public EventCallback OnCancelTask { get; set; }
+    [Parameter] public EventCallback<long?> OnProjectChanged { get; set; }
+    [Parameter] public EventCallback<long?> OnClientChanged { get; set; }
+
+    private async Task OnSave()
+    {
+        await OnSaveTask.InvokeAsync(Task);
+    }
+
+    private async Task OnCancel()
+    {
+        await OnCancelTask.InvokeAsync();
+    }
+
+    private async Task OnProjectChange(ChangeEventArgs e)
+    {
+        if (long.TryParse(e.Value?.ToString(), out var value))
+        {
+            await OnProjectChanged.InvokeAsync(value);
+        }
+        else
+        {
+            await OnProjectChanged.InvokeAsync(null);
+        }
+    }
+
+    private async Task OnClientChange(ChangeEventArgs e)
+    {
+        if (long.TryParse(e.Value?.ToString(), out var value))
+        {
+            await OnClientChanged.InvokeAsync(value);
+        }
+        else
+        {
+            await OnClientChanged.InvokeAsync(null);
+        }
+    }
+}

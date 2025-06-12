@@ -1,0 +1,131 @@
+@using BlazorBootstrap
+@using DataContext
+@using DataModel.Enums
+@using DataService.Auth
+
+<Grid TItem="ProjectTask" @ref="grid"
+      Data="Tasks"
+      Class="table table-hover table-bordered table-striped text-nowrap"
+      AllowSorting="true"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="8"
+      Responsive="true"
+      Unit="Unit.Px">
+
+    <GridColumn TItem="ProjectTask" HeaderText="Cliente" SortKeySelector="item => item.ClientName" PropertyName="ClientName" FilterOperator="FilterOperator.Contains">
+        @context.ClientName
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="CECO" SortKeySelector="item => item.ProjectName" PropertyName="ProjectName" FilterOperator="FilterOperator.Contains">
+        @context.ProjectName
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="Tipo" SortKeySelector="item => item.TaskTypeName" PropertyName="TaskTypeName" FilterOperator="FilterOperator.Contains">
+        @context.TaskTypeName
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="n° Ticket" SortKeySelector="item => item.ProjectName" PropertyName="ProjectName" FilterOperator="FilterOperator.Contains">
+        @context.KanbanId
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="Titulo" TextNoWrap="true" SortKeySelector="item => item.Name" PropertyName="Name" FilterOperator="FilterOperator.Contains">
+        <div title="@context.Name" style="max-width: 21ch; overflow: hidden; text-overflow: ellipsis;">
+            @if (context.Name.Length > 21)
+            {
+                @(context.Name.Substring(0, 17) + "...")
+            }
+            else
+            {
+                @context.Name
+            }
+        </div>
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="Descripción" TextNoWrap="true" SortKeySelector="item => item.Description" PropertyName="Description" FilterOperator="FilterOperator.Contains">
+        @context.Description
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="Estimadas" TextAlignment="Alignment.End">
+        @{
+            var tooltip = string.Join("\n", context.ProjectTaskEstimations.Select(t => $"{t.RoleName}\t{t.Hours}"));
+        }
+
+        <span title="@tooltip">
+            @context.ProjectTaskEstimations.Sum(x => x.Hours)
+        </span>
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="Completadas" TextAlignment="Alignment.End" SortKeySelector="item => item.Completed" PropertyName="Completed" FilterOperator="FilterOperator.Equals">
+        @context.Completed
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="Progreso" TextAlignment="Alignment.End" SortKeySelector="item => item.Progress" PropertyName="Progress" FilterOperator="FilterOperator.Equals">
+        @context.Progress.ToString("P")
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="Finalizado" SortKeySelector="item => item.Finished" PropertyName="Finished" FilterOperator="FilterOperator.Equals">
+        @if (context.Finished)
+        {
+            <span class="oi oi-circle-check" aria-hidden="true" style="color: var(--l-green)"></span>
+        }
+        else
+        {
+            <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-red)"></span>
+        }
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="row">
+            <div class="col-12 d-flex">
+
+                @if (!context.Finished)
+                {
+                    <Button @onclick="() => OnFinishTask.InvokeAsync(context)">
+                        <span class="oi oi-bolt" aria-hidden="true" title="Finalizar Tarea" style="color: var(--l-yellow)"></span>
+                    </Button>
+
+                    <Button @onclick="() => OnEditTask.InvokeAsync(context)">
+                        <span class="oi oi-pencil" aria-hidden="true" title="Editar"></span>
+                    </Button>
+
+                    @if (ShowEstimateAction)
+                    {
+                        <Button @onclick="() => OnEstimateTask.InvokeAsync(context)">
+                            <span class="oi oi-clock" aria-hidden="true" title="Estimar"></span>
+                        </Button>
+                    }
+                }
+
+                <Button @onclick="() => OnViewHistory.InvokeAsync(context)">
+                    <span class="oi oi-magnifying-glass" aria-hidden="true" title="Ver Historial"></span>
+                </Button>
+
+                @if (!context.Finished)
+                {
+                    <Button @onclick="() => OnDeleteTask.InvokeAsync(context)">
+                        <span class="oi oi-circle-x" aria-hidden="true" title="Eliminar" style="color: var(--l-red)"></span>
+                    </Button>
+                }
+            </div>
+        </div>
+    </GridColumn>
+</Grid>
+
+@code {
+    [Parameter] public List<ProjectTask> Tasks { get; set; } = new();
+    [Parameter] public bool ShowEstimateAction { get; set; } = false;
+    
+    [Parameter] public EventCallback<ProjectTask> OnEditTask { get; set; }
+    [Parameter] public EventCallback<ProjectTask> OnDeleteTask { get; set; }
+    [Parameter] public EventCallback<ProjectTask> OnFinishTask { get; set; }
+    [Parameter] public EventCallback<ProjectTask> OnEstimateTask { get; set; }
+    [Parameter] public EventCallback<ProjectTask> OnViewHistory { get; set; }
+
+    private Grid<ProjectTask> grid;
+
+    public async Task RefreshAsync()
+    {
+        await grid.RefreshDataAsync();
+    }
+}
