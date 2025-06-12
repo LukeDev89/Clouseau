@@ -1,0 +1,77 @@
+@using BlazorBootstrap
+@using DataContext
+
+<Grid TItem="FeedBackImprovement" @ref="grid"
+      Data="Improvements"
+      Class="table table-hover table-bordered table-striped"
+      AllowSorting="true"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="8"
+      Responsive="true">
+
+    <GridColumn TItem="FeedBackImprovement" HeaderText="Área de Mejora" SortKeySelector="item => item.Name" PropertyName="Name" FilterOperator="FilterOperator.Contains">
+        @context.Name
+    </GridColumn>
+
+    <GridColumn TItem="FeedBackImprovement" HeaderText="Descripción" SortKeySelector="item => item.Description" PropertyName="Description" FilterOperator="FilterOperator.Contains">
+        @context.Description
+    </GridColumn>
+
+    <GridColumn TItem="FeedBackImprovement" HeaderText="Activo" Sortable="false" Filterable="false">
+        <div style="text-align: center;">
+            @if (context.Active.HasValue && context.Active.Value)
+            {
+                <span class="oi oi-circle-check" aria-hidden="true" style="color: var(--l-green)"></span>
+            }
+            else
+            {
+                <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-red)"></span>
+            }
+        </div>
+    </GridColumn>
+
+    <GridColumn TItem="FeedBackImprovement" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="text-center">
+            <div class="d-inline-flex">
+                <Button @onclick="() => OnEditImprovement.InvokeAsync(context)">
+                    <span class="oi oi-pencil" aria-hidden="true" title="Editar"></span>
+                </Button>
+
+                <Button @onclick="() => OnToggleActive.InvokeAsync(context)">
+                    @if (context != null && context.Active.HasValue)
+                    {
+                        if (context.Active.Value)
+                        {
+                            <span class="oi oi-circle-x" style="color: var(--l-red)" aria-hidden="true" title="Inhabilitar"></span>
+                        }
+                        else
+                        {
+                            <span class="oi oi-circle-check" style="color: var(--l-green)" aria-hidden="true" title="Habilitar"></span>
+                        }
+                    }
+                </Button>
+
+                <Button @onclick="() => OnDeleteImprovement.InvokeAsync(context)">
+                    <span class="oi oi-trash" aria-hidden="true" title="Eliminar"></span>
+                </Button>
+            </div>
+        </div>
+    </GridColumn>
+
+</Grid>
+
+@code {
+    [Parameter] public List<FeedBackImprovement> Improvements { get; set; } = new();
+    
+    [Parameter] public EventCallback<FeedBackImprovement> OnEditImprovement { get; set; }
+    [Parameter] public EventCallback<FeedBackImprovement> OnDeleteImprovement { get; set; }
+    [Parameter] public EventCallback<FeedBackImprovement> OnToggleActive { get; set; }
+
+    private Grid<FeedBackImprovement> grid;
+
+    public async Task RefreshAsync()
+    {
+        await grid.RefreshDataAsync();
+    }
+}

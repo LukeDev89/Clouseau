@@ -1,7 +1,474 @@
-﻿@inherits Management
+﻿@using BlazorBootstrap
+@using DataContext
+@using DataModel.Enums
+@using DataService.Auth
+@using DataService.Interfaces.Management
+@using DataService.Interfaces.ProjectManagement
+@using DataService.State
+@using Website.Client.Pages.ProjectManagement.ProjectTasks.Components
+@using Website.Client.Pages.SystemManagement.NonworkingDays.Component
 
-<div class="row" style="margin-top: 20px">
+@inherits Management
+
+@inject IProjectTaskService _projectTaskService
+@inject IProjectTaskEstimationService _taskEstimationService
+@inject IRoleService _roleService
+@inject ITaskProgressService _taskProgressService
+@inject IProjectService _projectService
+@inject ITaskTypeService _taskTypeService
+@inject IClientService _clientService
+@inject AuthService _authService
+@inject ChangedState _changedState
+
+<br />
+
+<div class="row">
     <div class="col-12">
-        <ProjectTasksGrid />
+        <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleCreateForm">Crear Tarea</Button>
     </div>
 </div>
+
+<Collapse @ref="createFormCollapse" Class="custom-container">
+    <ProjectTaskForm 
+        Task="@_newTask"
+        Projects="@_projects"
+        Clients="@_clients"
+        TaskTypes="@_taskTypes"
+        IsEdit="false"
+        IsProjectDisabled="@_isProjectDisabled"
+        IsClientDisabled="@_isClientDisabled"
+        OnSaveTask="HandleSaveNewTask"
+        OnCancelTask="HandleCancelNewTask"
+        OnProjectChanged="HandleProjectChanged"
+        OnClientChanged="HandleClientChanged" />
+</Collapse>
+
+<br />
+<br />
+
+<ProjectTaskGrid 
+    Tasks="@_tasks"
+    ShowEstimateAction="@_showEstimateAction"
+    OnEditTask="HandleEditTask"
+    OnDeleteTask="HandleDeleteTask"
+    OnFinishTask="HandleFinishTask"
+    OnEstimateTask="HandleEstimateTask"
+    OnViewHistory="HandleViewHistory"
+    @ref="taskGrid" />
+
+@if (_showEditModal)
+{
+    <Modal @ref="editModal" Title="Editar Tarea" Size="ModalSize.Large">
+        <BodyTemplate>
+            <div class="row">
+                <div class="col-12">
+                    <h4><b>@_editingTask.Name</b></h4>
+                </div>
+            </div>
+            <div class="row pt-1">
+                <div class="col-12">
+                    <p>@_editingTask.TaskType</p>
+                </div>
+            </div>
+            <div class="row pt-2">
+                <div class="col-4 d-flex align-items-center">
+                    Titulo
+                </div>
+                <div class="col-8">
+                    <InputText Class="form-control" @bind-Value="@_editingTask.Name"></InputText>
+                </div>
+            </div>
+            <div class="row pt-2">
+                <div class="col-4 d-flex align-items-center">
+                    n° Ticket
+                </div>
+                <div class="col-8">
+                    <InputText Class="form-control" @bind-Value="@_editingTask.KanbanId" maxlength="8"></InputText>
+                </div>
+            </div>
+            <div class="row pt-2">
+                <div class="col-4 d-flex align-items-center">
+                    Descripcion
+                </div>
+                <div class="col-8">
+                    <textarea Class="form-control" @bind="@_editingTask.Description" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="row pt-2">
+                <div class="col-4 d-flex align-items-center">
+                    Tipo
+                </div>
+                <div class="col-8">
+                    <InputSelect class="form-select" @bind-Value="_editingTask.TaskTypeId">
+                        <option selected value=-1 disabled>Seleccione</option>
+                        @foreach (var p in _taskTypes)
+                        {
+                            <option value=@p.Id>@p.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+            </div>
+        </BodyTemplate>
+        <FooterTemplate>
+            <div class="row">
+                <div class="col-3">
+                    <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="HandleCancelEdit">Cerrar</Button>
+                </div>
+                <div class="col-3">
+                    <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="HandleSaveEdit">Guardar</Button>
+                </div>
+            </div>
+        </FooterTemplate>
+    </Modal>
+}
+
+@if (_showHistoryModal)
+{
+    <Modal @ref="historyModal" Title="Ver Historial" Size="ModalSize.Large">
+        <BodyTemplate>
+            <div class="row">
+                <div class="col-12">
+                    <h4><b>@_historyTask.Name</b></h4>
+                </div>
+            </div>
+            <br />
+            <div class="row pt-1">
+                <div class="col-12">
+                    <p>@_historyTask.Description</p>
+                </div>
+            </div>
+
+            <div class="row pt-3">
+                <div class="col-12" style="overflow: auto; margin-bottom: 10px">
+                    @foreach (var progress in _taskProgress)
+                    {
+                        <div class="row history-container">
+                            <div class="col-12">
+                                <div class="row" style="margin-top: 10px">
+                                    <div class="col-8 d-flex align-items-center">
+                                        <b>@progress.User.Username</b>
+                                    </div>
+                                    <div class="col-4 d-flex align-items-center justify-content-end">
+                                        <span style="font-size: 12px">@progress.Date.ToString("dd/MM/yyyy HH:mm")</span>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-12">
+                                        <span style="font-size: 14px">@progress.Description</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </BodyTemplate>
+        <FooterTemplate>
+            <div class="row">
+                <div class="col-3">
+                    <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="HandleCloseHistory">Cerrar</Button>
+                </div>
+            </div>
+        </FooterTemplate>
+    </Modal>
+}
+
+<ConfirmDialog @ref="confirmDialog" />
+
+@code {
+    private List<ProjectTask> _tasks = new();
+    private List<Project> _projects = new();
+    private List<Client> _clients = new();
+    private List<TaskType> _taskTypes = new();
+    private List<TaskEstimation> _taskEstimations = new();
+    private List<Role> _roles = new();
+    private List<TaskProgress> _taskProgress = new();
+    
+    private ProjectTask _newTask = new();
+    private ProjectTask _editingTask = new();
+    private ProjectTask _historyTask = new();
+    
+    private bool _isProjectDisabled = false;
+    private bool _isClientDisabled = false;
+    private bool _showEstimateAction = false;
+    private bool _showEditModal = false;
+    private bool _showHistoryModal = false;
+    
+    private Collapse createFormCollapse;
+    private Modal editModal;
+    private Modal historyModal;
+    private ConfirmDialog confirmDialog;
+    private ProjectTaskGrid taskGrid;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PreloadService.Show();
+
+        try
+        {
+            _changedState.ChangeAction += StateHasChanged;
+            await LoadData();
+            _showEstimateAction = _authService.User?.Permissions?.Contains((long)SectionsEnum.Administrar) ?? false;
+            await base.OnInitializedAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+        finally
+        {
+            PreloadService.Hide();
+        }
+    }
+
+    public void Dispose()
+    {
+        _changedState.ChangeAction -= StateHasChanged;
+    }
+
+    private async Task LoadData()
+    {
+        await LoadComboData();
+        await LoadTasks();
+    }
+
+    private async Task LoadComboData()
+    {
+        _projects = (await _projectService.GetAsync()).Where(x => x.Active).ToList();
+        _taskTypes = (await _taskTypeService.GetAsync()).Where(x => !x.Name.Contains("ndefinid")).ToList();
+        _clients = (await _clientService.GetAsync()).ToList();
+        _taskEstimations = (await _taskEstimationService.GetAsync()).ToList();
+        _roles = (await _roleService.GetAsync()).ToList();
+    }
+
+    private async Task LoadTasks()
+    {
+        _tasks = _authService.User.ProfileId == (long)ProfileTypes.Administrador ?
+                        await _projectTaskService.GetAsync() :
+                        await _projectTaskService.GetByTeamsIdAsync(_authService.User.UserTeams.Select(x => x.TeamId).ToList());
+    }
+
+    private async Task ToggleCreateForm()
+    {
+        await createFormCollapse.ToggleAsync();
+    }
+
+    private async Task HandleSaveNewTask(ProjectTask task)
+    {
+        try
+        {
+            if (task.ProjectId == -1)
+                task.ProjectId = null;
+            if (task.ClientId == -1)
+                task.ClientId = null;
+
+            await _projectTaskService.AddAsync(task);
+
+            ToastService.Notify(new ToastMessage
+            {
+                Type = ToastType.Success,
+                Message = "Tarea creada con éxito.",
+                Title = "Crear Tarea"
+            });
+
+            await HandleCancelNewTask();
+            await LoadTasks();
+            await taskGrid.RefreshAsync();
+            _changedState.InitChanges();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+    }
+
+    private async Task HandleCancelNewTask()
+    {
+        _newTask = new ProjectTask();
+        _isProjectDisabled = false;
+        _isClientDisabled = false;
+        await createFormCollapse.HideAsync();
+        StateHasChanged();
+    }
+
+    private async Task HandleProjectChanged(long? projectId)
+    {
+        _isClientDisabled = projectId != null && projectId != -1;
+        StateHasChanged();
+    }
+
+    private async Task HandleClientChanged(long? clientId)
+    {
+        _isProjectDisabled = clientId != null && clientId != -1;
+        StateHasChanged();
+    }
+
+    private async Task HandleEditTask(ProjectTask task)
+    {
+        _editingTask = task;
+        _showEditModal = true;
+        await editModal?.ShowAsync();
+    }
+
+    private async Task HandleSaveEdit()
+    {
+        try
+        {
+            _editingTask.TaskTypeId = _editingTask.TaskTypeId == -1 ? null : _editingTask.TaskTypeId;
+            _editingTask.TaskType = _editingTask.TaskTypeId == null ? null : _editingTask.TaskType;
+
+            await _projectTaskService.EditAsync(_editingTask);
+
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Success,
+                Message = "Tarea modificada con éxito.",
+                Title = "Modificar Tarea"
+            });
+
+            await HandleCancelEdit();
+            await LoadTasks();
+            await taskGrid.RefreshAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+    }
+
+    private async Task HandleCancelEdit()
+    {
+        _showEditModal = false;
+        await editModal?.HideAsync();
+    }
+
+    private async Task HandleDeleteTask(ProjectTask task)
+    {
+        try
+        {
+            var parameters = new Dictionary<string, object>
+            {
+                ["taskName"] = task.Name
+            };
+
+            var confirmation = await confirmDialog.ShowAsync<CustomConfirmDialog>("Eliminar Tarea", parameters);
+
+            if (confirmation)
+            {
+                task.Active = false;
+                await _projectTaskService.EditAsync(task);
+
+                ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Tarea eliminada con éxito.",
+                    Title = "Eliminar Tarea"
+                });
+
+                await LoadTasks();
+                await taskGrid.RefreshAsync();
+            }
+            else
+            {
+                ToastService.Notify(new ToastMessage(ToastType.Secondary, "Acción cancelada."));
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+    }
+
+    private async Task HandleFinishTask(ProjectTask task)
+    {
+        try
+        {
+            var parameters = new Dictionary<string, object>
+            {
+                ["taskName"] = task.Name
+            };
+
+            var confirmation = await confirmDialog.ShowAsync<CustomConfirmDialog>("Finalizar Tarea", parameters);
+
+            if (confirmation)
+            {
+                await _projectTaskService.FinishAsync(task.Id);
+
+                ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Tarea finalizada con éxito.",
+                    Title = "Finalizar Tarea"
+                });
+
+                await LoadTasks();
+                await taskGrid.RefreshAsync();
+            }
+            else
+            {
+                ToastService.Notify(new ToastMessage(ToastType.Secondary, "Acción cancelada."));
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+    }
+
+    private async Task HandleEstimateTask(ProjectTask task)
+    {
+        // TODO: Implement estimate functionality
+        // This would be extracted to a separate component in a full implementation
+    }
+
+    private async Task HandleViewHistory(ProjectTask task)
+    {
+        try
+        {
+            _historyTask = task;
+            _taskProgress = await _taskProgressService.GetByTaskIdAsync(task.Id);
+            _showHistoryModal = true;
+            await historyModal?.ShowAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+    }
+
+    private async Task HandleCloseHistory()
+    {
+        _showHistoryModal = false;
+        await historyModal?.HideAsync();
+    }
+}

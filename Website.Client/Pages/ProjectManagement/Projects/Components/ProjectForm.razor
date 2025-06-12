@@ -1,0 +1,121 @@
+@using BlazorBootstrap
+@using DataContext
+
+<Card>
+    <CardBody>
+        <div class="row">
+            <div class="col-3">CECO</div>
+            <div class="col-3">Equipo</div>
+            <div class="col-3">Cliente</div>
+            <div class="col-3">Responsable</div>
+        </div>
+
+        <div class="row mt-2">
+            <div class="col-3">
+                <InputText Class="form-control" @bind-Value="@Project.Name"></InputText>
+            </div>
+            <div class="col-3">
+                <InputSelect class="form-select" @bind-Value="Project.TeamId">
+                    <option selected value="-1" disabled>Seleccione</option>
+                    @foreach (var team in Teams)
+                    {
+                        <option value="@team.Id">@team.Name</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-3">
+                <InputSelect class="form-select" @bind-Value="Project.ClientId" @oninput="OnClientChange">
+                    <option selected value="-1" disabled>Seleccione</option>
+                    @foreach (var client in Clients)
+                    {
+                        <option value="@client.Id">@client.Name</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-3">
+                <InputSelect class="form-select" @bind-Value="Project.ClientResponsibleId">
+                    <option value="-1" disabled="@(Project.ClientResponsibleId != -1)">Seleccione</option>
+                    @if (FilteredResponsibles != null && FilteredResponsibles.Count > 0)
+                    {
+                        @foreach (var responsible in FilteredResponsibles)
+                        {
+                            <option value="@responsible.Id">@responsible.Name</option>
+                        }
+                    }
+                    else
+                    {
+                        <option value="-1" disabled="true">No hay Responsables asignados</option>
+                    }
+                </InputSelect>
+            </div>
+        </div>
+
+        @if (IsEdit)
+        {
+            <br />
+            <div class="row align-items-center">
+                <div class="col-2 text-center">
+                    Activo
+                </div>
+                <div class="col-10">
+                    <InputCheckbox @bind-Value="Project.Active" />
+                </div>
+            </div>
+        }
+
+        <br />
+
+        <div class="row">
+            <div class="col-6"></div>
+            <div class="col-6">
+                <div class="row">
+                    <div class="col-6"></div>
+                    <div class="col-3">
+                        <Button Class="btn btn-secondary form-control" @onclick="OnCancel">
+                            Limpiar
+                        </Button>
+                    </div>
+                    <div class="col-3">
+                        <Button Class="btn btn-primary form-control" @onclick="OnSave">
+                            @(IsEdit ? "Guardar" : "Crear")
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </CardBody>
+</Card>
+
+@code {
+    [Parameter] public Project Project { get; set; } = new Project();
+    [Parameter] public List<Team> Teams { get; set; } = new();
+    [Parameter] public List<Client> Clients { get; set; } = new();
+    [Parameter] public List<ClientResponsible> FilteredResponsibles { get; set; } = new();
+    [Parameter] public bool IsEdit { get; set; } = false;
+    
+    [Parameter] public EventCallback<Project> OnSaveProject { get; set; }
+    [Parameter] public EventCallback OnCancelProject { get; set; }
+    [Parameter] public EventCallback<long?> OnClientChanged { get; set; }
+
+    private async Task OnSave()
+    {
+        await OnSaveProject.InvokeAsync(Project);
+    }
+
+    private async Task OnCancel()
+    {
+        await OnCancelProject.InvokeAsync();
+    }
+
+    private async Task OnClientChange(ChangeEventArgs e)
+    {
+        if (long.TryParse(e.Value?.ToString(), out var value))
+        {
+            await OnClientChanged.InvokeAsync(value);
+        }
+        else
+        {
+            await OnClientChanged.InvokeAsync(null);
+        }
+    }
+}

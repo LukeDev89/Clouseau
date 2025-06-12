@@ -1,0 +1,76 @@
+@using BlazorBootstrap
+@using DataContext
+
+<Card>
+    <CardBody>
+        <div class="row">
+            <div class="col-12">
+                <span class="text-nowrap">Nombre</span>
+            </div>
+            <div class="col-12">
+                <InputText class="form-control" @bind-Value="@Improvement.Name" rows="1"></InputText>
+            </div>
+        </div>
+
+        <div class="row mt-2">
+            <div class="col-12">
+                <span class="text-nowrap">Descripción</span>
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-12">
+                <textarea class="form-control" @bind="Improvement.Description" rows="3"></textarea>
+            </div>
+        </div>
+        
+        @if (IsEdit)
+        {
+            <div class="row mt-2">
+                <div class="col-12">
+                    <div class="form-check">
+                        <InputCheckbox class="form-check-input" @bind-Value="Improvement.Active" />
+                        <label class="form-check-label">Activo</label>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="row mt-4">
+            <div class="col-6">
+            </div>
+            <div class="col-6">
+                <div class="row">
+                    <div class="col-6"></div>
+                    <div class="col-3">
+                        <Button Class="btn btn-secondary form-control" @onclick="OnCancel">
+                            Limpiar
+                        </Button>
+                    </div>
+                    <div class="col-3">
+                        <Button Class="btn btn-primary form-control" @onclick="OnSave">
+                            @(IsEdit ? "Guardar" : "Crear")
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </CardBody>
+</Card>
+
+@code {
+    [Parameter] public FeedBackImprovement Improvement { get; set; } = new FeedBackImprovement();
+    [Parameter] public bool IsEdit { get; set; } = false;
+    
+    [Parameter] public EventCallback<FeedBackImprovement> OnSaveImprovement { get; set; }
+    [Parameter] public EventCallback OnCancelImprovement { get; set; }
+
+    private async Task OnSave()
+    {
+        await OnSaveImprovement.InvokeAsync(Improvement);
+    }
+
+    private async Task OnCancel()
+    {
+        await OnCancelImprovement.InvokeAsync();
+    }
+}

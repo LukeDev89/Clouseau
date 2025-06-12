@@ -1,0 +1,101 @@
+@using BlazorBootstrap
+@using DataContext
+
+<Grid TItem="Team" @ref="grid"
+    Class="table table-hover table-bordered table-striped"
+    Data="Teams"
+    AllowSorting="true"
+    AllowFiltering="true"
+    AllowPaging="true"
+    PageSize="8"
+    Responsive="true">
+
+    <GridColumn TItem="Team" HeaderText="Equipo" SortKeySelector="item => item.Name" PropertyName="Name" FilterOperator="FilterOperator.Contains">
+        @context.Name
+    </GridColumn>
+
+    <GridColumn TItem="Team" HeaderText="Usuarios" Sortable="false" Filterable="false">
+        <div class="tooltip-container">
+            <div class="row">
+                <div class="col-12 d-flex align-items-center justify-content-center tooltip-text">
+                    <span>
+                        @if (context.UserTeams.Count == 0)
+                        {
+                            <text>Sin usuarios asignados</text>
+                        }
+                        else
+                        {
+                            @foreach (var u in context.UserTeams)
+                            {
+                                <div>
+                                    @u.User.Firstname @u.User.Lastname (@u.User.Username) <br />
+                                </div>
+                            }
+                        }
+                    </span>
+                </div>
+            </div>
+            <span class="oi oi-info" aria-hidden="true"></span>
+        </div>
+    </GridColumn>
+
+    <GridColumn TItem="Team" HeaderText="Creado" SortKeySelector="item => item._Created" PropertyName="_Created" FilterOperator="FilterOperator.Equals">
+        @context.Created.ToString("dd/MM/yyyy")
+    </GridColumn>
+
+    <GridColumn TItem="Team" HeaderText="Baja" SortKeySelector="item => item._Deleted" PropertyName="_Deleted" FilterOperator="FilterOperator.Equals">
+        @context.Deleted?.ToString("dd/MM/yyyy")
+    </GridColumn>
+
+    <GridColumn TItem="Team" HeaderText="Activo" SortKeySelector="item => item.Active" PropertyName="Active" FilterOperator="FilterOperator.Equals">
+        @if (context.Active)
+        {
+            <span class="oi oi-circle-check" aria-hidden="true" style="color: var(--l-green)"></span>
+        }
+        else
+        {
+            <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-red)"></span>
+        }
+    </GridColumn>
+
+    <GridColumn TItem="Team" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="row">
+            <div class="col-12 d-flex">
+                <Button @onclick="() => OnEditTeam.InvokeAsync(context)">
+                    <span class="oi oi-pencil" aria-hidden="true" title="Editar"></span>
+                </Button>
+                <Button @onclick="() => OnManageUsers.InvokeAsync(context)">
+                    <span class="oi oi-person" aria-hidden="true" title="Editar Usuarios"></span>
+                </Button>
+                @if (!context.Active)
+                {
+                    <Button @onclick="() => OnDeleteTeam.InvokeAsync(context)">
+                        <span class="oi oi-trash" aria-hidden="true" title="Eliminar" style="color: var(--l-yellow)"></span>
+                    </Button>
+                }
+                else
+                {
+                    <Button @onclick="() => OnDeactivateTeam.InvokeAsync(context)">
+                        <span class="oi oi-circle-x" aria-hidden="true" title="Eliminar" style="color: var(--l-red)"></span>
+                    </Button>
+                }
+            </div>
+        </div>
+    </GridColumn>
+</Grid>
+
+@code {
+    [Parameter] public List<Team> Teams { get; set; } = new();
+    
+    [Parameter] public EventCallback<Team> OnEditTeam { get; set; }
+    [Parameter] public EventCallback<Team> OnDeleteTeam { get; set; }
+    [Parameter] public EventCallback<Team> OnDeactivateTeam { get; set; }
+    [Parameter] public EventCallback<Team> OnManageUsers { get; set; }
+
+    private Grid<Team> grid;
+
+    public async Task RefreshAsync()
+    {
+        await grid.RefreshDataAsync();
+    }
+}

@@ -1,7 +1,383 @@
-﻿@inherits Management
+﻿@using BlazorBootstrap
+@using DataContext
+@using DataService.Interfaces.Management
+@using DataService.Interfaces.ProjectManagement
+@using DataService.State
+@using Website.Client.Pages.ProjectManagement.Projects.Components
 
-<div class="row" style="margin-top: 20px">
+@inherits Management
+
+@inject IProjectService _projectService
+@inject IClientService _clientService
+@inject ITeamService _teamService
+@inject IResponsibleService _responsibleService
+@inject ChangedState _changedState
+
+<br />
+
+<div class="row">
     <div class="col-12">
-        <ProjectsGrid />
+        <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleCreateForm">
+            Crear CECO
+        </Button>
     </div>
 </div>
+
+<Collapse @ref="createFormCollapse">
+    <ProjectForm 
+        Project="@_newProject"
+        Teams="@_teams"
+        Clients="@_clients"
+        FilteredResponsibles="@_filteredResponsibles"
+        IsEdit="false"
+        OnSaveProject="HandleSaveNewProject"
+        OnCancelProject="HandleCancelNewProject"
+        OnClientChanged="HandleClientChanged" />
+</Collapse>
+
+<br />
+<br />
+
+<ProjectGrid 
+    Projects="@_projects"
+    OnEditProject="HandleEditProject"
+    OnDeleteProject="HandleDeleteProject"
+    @ref="projectGrid" />
+
+@if (_showEditModal)
+{
+    <Modal @ref="editModal" Title="Editar CECO" Size="ModalSize.Large">
+        <BodyTemplate>
+            <div class="row">
+                <div class="col-12">
+                    <h4><b>@_editingProject.Name</b></h4>
+                </div>
+            </div>
+
+            <br />
+
+            <div class="row align-items-center">
+                <div class="col-2 text-center">
+                    Nombre
+                </div>
+                <div class="col-10">
+                    <InputText Class="form-control" @bind-Value="@_editingProject.Name"></InputText>
+                </div>
+            </div>
+
+            <br />
+
+            <div class="row align-items-center">
+                <div class="col-2 text-center">
+                    Equipo
+                </div>
+                <div class="col-10">
+                    <InputSelect class="form-select" @bind-Value="_editingProject.TeamId">
+                        <option selected value="-1" disabled>Seleccione</option>
+                        @foreach (var team in _teams)
+                        {
+                            <option value="@team.Id">@team.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+            </div>
+
+            <br />
+
+            <div class="row align-items-center">
+                <div class="col-2 text-center">
+                    Cliente
+                </div>
+                <div class="col-10">
+                    <InputSelect class="form-select" @bind-Value="_editingProject.ClientId" @oninput="HandleEditClientChanged">
+                        <option selected value="-1" disabled>Seleccione</option>
+                        @foreach (var client in _clients)
+                        {
+                            <option value="@client.Id">@client.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+            </div>
+
+            <br />
+
+            <div class="row align-items-center">
+                <div class="col-2 text-center">
+                    Responsable
+                </div>
+                <div class="col-10">
+                    <InputSelect class="form-select" @bind-Value="_editingProject.ClientResponsibleId">
+                        <option value="-1" disabled="@(_editingProject.ClientResponsibleId != -1)">Seleccione</option>
+                        @if (_editFilteredResponsibles != null && _editFilteredResponsibles.Count > 0)
+                        {
+                            @foreach (var responsible in _editFilteredResponsibles)
+                            {
+                                <option value="@responsible.Id">@responsible.Name</option>
+                            }
+                        }
+                        else
+                        {
+                            <option value="-1" disabled="true">No hay Responsables asignados</option>
+                        }
+                    </InputSelect>
+                </div>
+            </div>
+
+            <br />
+
+            <div class="row align-items-center">
+                <div class="col-2 text-center">
+                    Activo
+                </div>
+                <div class="col-10">
+                    <InputCheckbox @bind-Value="_editingProject.Active" />
+                </div>
+            </div>
+
+        </BodyTemplate>
+        <FooterTemplate>
+            <div class="row">
+                <div class="col-3">
+                    <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="HandleCancelEdit">Cerrar</Button>
+                </div>
+                <div class="col-3">
+                    <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="HandleSaveEdit">Guardar</Button>
+                </div>
+            </div>
+        </FooterTemplate>
+    </Modal>
+}
+
+<ConfirmDialog @ref="confirmDialog" />
+
+@code {
+    private List<Project> _projects = new();
+    private List<Client> _clients = new();
+    private List<Team> _teams = new();
+    private List<ClientResponsible> _clientResponsibles = new();
+    private List<ClientResponsible> _filteredResponsibles = new();
+    private List<ClientResponsible> _editFilteredResponsibles = new();
+    
+    private Project _newProject = new();
+    private Project _editingProject = new();
+    
+    private bool _showEditModal = false;
+    
+    private Collapse createFormCollapse;
+    private Modal editModal;
+    private ConfirmDialog confirmDialog;
+    private ProjectGrid projectGrid;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PreloadService.Show();
+
+        try
+        {
+            _changedState.ChangeAction += StateHasChanged;
+            await LoadData();
+            await base.OnInitializedAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+        finally
+        {
+            PreloadService.Hide();
+        }
+    }
+
+    public void Dispose()
+    {
+        _changedState.ChangeAction -= StateHasChanged;
+    }
+
+    private async Task LoadData()
+    {
+        await LoadComboData();
+        await LoadProjects();
+    }
+
+    private async Task LoadComboData()
+    {
+        _clients = (await _clientService.GetAsync()).Where(x => x.Active).ToList();
+        _teams = (await _teamService.GetAsync()).Where(x => x.Active).ToList();
+        _clientResponsibles = (await _responsibleService.GetAsync()).ToList();
+    }
+
+    private async Task LoadProjects()
+    {
+        _projects = (await _projectService.GetAsync()).ToList();
+    }
+
+    private async Task ToggleCreateForm()
+    {
+        await createFormCollapse.ToggleAsync();
+    }
+
+    private async Task HandleSaveNewProject(Project project)
+    {
+        try
+        {
+            await _projectService.AddAsync(project);
+
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Success,
+                Message = "Acción realizada con éxito",
+                Title = "Agregar CECO"
+            });
+
+            await HandleCancelNewProject();
+            await LoadProjects();
+            await projectGrid.RefreshAsync();
+            _changedState.InitChanges();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+    }
+
+    private async Task HandleCancelNewProject()
+    {
+        _newProject = new Project();
+        _filteredResponsibles = new List<ClientResponsible>();
+        await createFormCollapse.HideAsync();
+        StateHasChanged();
+    }
+
+    private async Task HandleClientChanged(long? clientId)
+    {
+        if (clientId != null && clientId > 0)
+        {
+            _filteredResponsibles = _clientResponsibles.Where(x => x.ClientId == clientId).ToList();
+        }
+        else
+        {
+            _filteredResponsibles = new List<ClientResponsible>();
+        }
+        StateHasChanged();
+    }
+
+    private async Task HandleEditProject(Project project)
+    {
+        _editingProject = project;
+        
+        // Filter responsibles for edit modal
+        if (project.ClientId != null && project.ClientId > 0)
+        {
+            _editFilteredResponsibles = _clientResponsibles.Where(x => x.ClientId == project.ClientId).ToList();
+        }
+        else
+        {
+            _editFilteredResponsibles = new List<ClientResponsible>();
+        }
+        
+        _showEditModal = true;
+        await editModal?.ShowAsync();
+    }
+
+    private async Task HandleEditClientChanged(ChangeEventArgs e)
+    {
+        if (long.TryParse(e.Value?.ToString(), out var clientId) && clientId > 0)
+        {
+            _editFilteredResponsibles = _clientResponsibles.Where(x => x.ClientId == clientId).ToList();
+            _editingProject.ClientResponsibleId = -1; // Reset responsible selection
+        }
+        else
+        {
+            _editFilteredResponsibles = new List<ClientResponsible>();
+        }
+        StateHasChanged();
+    }
+
+    private async Task HandleSaveEdit()
+    {
+        try
+        {
+            await _projectService.EditAsync(_editingProject);
+
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Success,
+                Message = "Acción realizada con éxito",
+                Title = "Editar CECO"
+            });
+
+            await HandleCancelEdit();
+            await LoadProjects();
+            await projectGrid.RefreshAsync();
+            _changedState.InitChanges();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+    }
+
+    private async Task HandleCancelEdit()
+    {
+        _showEditModal = false;
+        await editModal?.HideAsync();
+    }
+
+    private async Task HandleDeleteProject(Project project)
+    {
+        try
+        {
+            var parameters = new Dictionary<string, object>
+            {
+                ["Message"] = $"¿Está seguro que desea eliminar el CECO '{project.Name}'?"
+            };
+
+            var confirmation = await confirmDialog.ShowAsync("Eliminar CECO", "¿Está seguro?", ToastType.Danger, "Eliminar");
+
+            if (confirmation)
+            {
+                project.Active = false;
+                await _projectService.EditAsync(project);
+
+                ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "CECO eliminado con éxito",
+                    Title = "Eliminar CECO"
+                });
+
+                await LoadProjects();
+                await projectGrid.RefreshAsync();
+                _changedState.InitChanges();
+            }
+            else
+            {
+                ToastService.Notify(new ToastMessage(ToastType.Secondary, "Acción cancelada."));
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+    }
+}
