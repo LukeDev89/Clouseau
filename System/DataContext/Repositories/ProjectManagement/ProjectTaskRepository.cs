@@ -475,6 +475,7 @@ namespace DataContext.Repositories.ProjectManagement
                     {
                         Date = DateOnly.FromDateTime(day),
                         Hours = taskProgress.Hours,
+                        ExtraHours = taskProgress.ExtraHours,
                         Task = taskProgress.Task.Name,
                         Project = taskProgress.Task.Project.Name,
                         TaskType = taskProgress.TaskType.Name,
@@ -499,6 +500,7 @@ namespace DataContext.Repositories.ProjectManagement
                     {
                         Date = DateOnly.FromDateTime(extraDay),
                         Hours = taskProgress.Hours,
+                        ExtraHours = taskProgress.ExtraHours,
                         Task = taskProgress.Task.Name,
                         Project = taskProgress.Task.Project.Name,
                         TaskType = taskProgress.TaskType.Name
@@ -565,6 +567,7 @@ namespace DataContext.Repositories.ProjectManagement
                     {
                         Date = DateOnly.FromDateTime(day),
                         Hours = taskProgress.Hours,
+                        ExtraHours = taskProgress.ExtraHours,
                         Task = taskProgress.Task.Name,
                         Project = taskProgress.Task.Project.Name,
                         TaskType = taskProgress.TaskType.Name,
@@ -589,6 +592,7 @@ namespace DataContext.Repositories.ProjectManagement
                     {
                         Date = DateOnly.FromDateTime(extraDay),
                         Hours = taskProgress.Hours,
+                        ExtraHours = taskProgress.ExtraHours,
                         Task = taskProgress.Task.Name,
                         Project = taskProgress.Task.Project.Name,
                         TaskType = taskProgress.TaskType.Name
