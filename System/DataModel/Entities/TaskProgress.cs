@@ -20,6 +20,8 @@ public partial class TaskProgress
 
     public decimal Hours { get; set; }
 
+    public decimal ExtraHours { get; set; }
+
     public long? UserAuditId { get; set; }
 
     public virtual TaskType TaskType { get; set; } = null!;
