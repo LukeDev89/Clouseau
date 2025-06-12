@@ -43,6 +43,7 @@ namespace DataContext.Repositories.Management
                         TaskId = r.TaskId,
                         UserId = r.UserId,
                         Hours = r.Hours,
+                        ExtraHours = r.ExtraHours,
                         Comment = string.IsNullOrEmpty(r.Comment) ? "" : r.Comment,
                         TaskTypeId = r.TaskTypeId,
                         Date = r.Date
@@ -66,6 +67,7 @@ namespace DataContext.Repositories.Management
                 var taskProgress = await _context.TaskProgresses.FirstAsync(x => x.Id == r.ProgressId);
 
                 taskProgress.Hours = r.Hours;
+                taskProgress.ExtraHours = r.ExtraHours;
                 taskProgress.Comment = string.IsNullOrEmpty(r.Comment) ? "" : r.Comment;
                 taskProgress.TaskTypeId = r.TaskTypeId;
                 taskProgress.Date = r.Date;
