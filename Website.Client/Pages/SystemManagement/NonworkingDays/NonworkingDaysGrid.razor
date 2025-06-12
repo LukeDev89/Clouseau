@@ -1,0 +1,219 @@
+﻿@using BlazorBootstrap;
+@using DataContext;
+@using DataModel.Enums;
+@using DataService.Auth;
+@using DataService.Interfaces.Management;
+@using DataService.State;
+@using System.Globalization;
+@using Website.Client.Pages.SystemManagement.NonworkingDays.Component
+
+@inherits NonworkingDays
+
+@inject INonworkingDaysService _nonworkingDaysService
+
+@inject AuthService _authService
+
+@inject NavigationManager uriHelper;
+
+@inject ChangedState changedState
+
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleContentAsync">Crear Feriado</Button>
+    </div>
+</div>
+
+<Collapse @ref="collapseAgregar" Class="custom-container">
+    <Card>
+        <CardBody>
+            <div class="row">
+                <div class="col-6">
+                    Descripción
+                </div>
+                <div class="col-3">
+                    Fecha
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-6">
+                    <InputText Class="form-control" @bind-Value="@createNonworkingDay.Description"></InputText>
+                </div>
+               
+                <div class="col-3">
+                    <DateInput Class="form-control" @bind-Value="@createNonworkingDay.Day"></DateInput>
+                </div>
+            </div>
+            <br />
+            <div class="row">
+                <div class="col-6">
+                </div>
+                <div class="col-6">
+                    <div class="row">
+                        <div class="col-6"></div>
+                        <div class="col-3">
+                            <Button Class="btn btn-secondary form-control" onclick="@(() => CancelAddTask())">
+                                Limpiar
+                            </Button>
+                        </div>
+                        <div class="col-3">
+                            <Button Class="btn btn-primary form-control" onclick="@(() => SaveAddTask())">
+                                Crear
+                            </Button>
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
+        </CardBody>
+    </Card>
+</Collapse>
+
+<br />
+<br />
+
+<Grid TItem="NonworkingDay" @ref="grid"
+    Data="_nonworkingDays"
+    Class="table table-hover table-bordered table-striped text-nowrap"
+    AllowSorting="true"
+    AllowFiltering="true"
+    AllowPaging="true"
+    PageSize="8"
+    Responsive="true"
+    Unit="Unit.Px">
+
+    <GridColumn TItem="NonworkingDay" HeaderText="Descripción" TextNoWrap="true" SortKeySelector="item => item.Description" PropertyName="Description" FilterOperator="FilterOperator.Contains">
+        @context.Description
+    </GridColumn>
+
+    <GridColumn TItem="NonworkingDay" HeaderText="Fecha" SortKeySelector="item => item._Day" PropertyName="_Day" FilterOperator="FilterOperator.Equals">
+        @context._Day.ToString("dd/MM/yyyy")
+    </GridColumn>
+
+    <GridColumn TItem="NonworkingDay" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="row">
+            <div class="col-12 d-flex">
+                <Button @onclick="async () => await DeleteTaskAsync(context.Id, context.Description, context._Day)">
+                    <span class="oi oi-circle-x" aria-hidden="true" title="Eliminar" style="color: var(--l-red)"></span>
+                </Button>
+            </div>
+        </div>
+    </GridColumn>
+</Grid>
+
+<ConfirmDialog @ref="dialog" />
+
+@code {
+    [Inject] ToastService ToastService { get; set; }
+    private ConfirmDialog dialog;
+
+    private Grid<NonworkingDay> grid;
+    private Collapse collapseAgregar;
+
+    private string? createDescription { get; set; }
+    private DateTime createDate { get; set; } = DateTime.Now;
+    private NonworkingDay createNonworkingDay { get; set; } = new NonworkingDay(){Day = DateTime.Now};
+
+    public long modalTaskId { get; set; }
+
+    private List<NonworkingDay> _nonworkingDays = new List<NonworkingDay>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetGrid();
+        await base.OnInitializedAsync();
+    }
+
+    private async Task GetGrid()
+    {
+        try
+        {
+            _nonworkingDays = await _nonworkingDaysService.GetAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveAddTask()
+    {
+        try
+        {
+            await _nonworkingDaysService.AddAsync(createNonworkingDay);
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Feriado creado con éxito.",
+                    Title = "Crear Feriado"
+                });
+
+            CancelAddTask();
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private void CancelAddTask()
+    {
+        createNonworkingDay.Description = (string?)null;
+        createNonworkingDay.Day = DateTime.Now;
+    }
+
+    private async Task DeleteTaskAsync(long Id, string description, DateOnly date)
+    {
+        try
+        {
+            var parameters = new Dictionary<string, object>();
+            parameters.Add("taskName", (description + " " + date.ToString("dd/MM/yyyy")).Trim());
+
+            var confirmation = await dialog.ShowAsync<CustomConfirmDialog>("Eliminar Feriado", parameters);
+
+            if (confirmation)
+            {
+                await _nonworkingDaysService.DeleteAsync(Id);
+
+                ToastService.Notify(new ToastMessage()
+                    {
+                        Type = ToastType.Success,
+                        Message = $"Feriado eliminado con éxito.",
+                        Title = "Eliminar Feriado"
+                    });
+
+                await GetGrid();
+                await grid.RefreshDataAsync();
+            }
+            else
+                ToastService.Notify(new ToastMessage(ToastType.Secondary, $"Acción cancelada."));
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+
+    }
+
+    private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
+}

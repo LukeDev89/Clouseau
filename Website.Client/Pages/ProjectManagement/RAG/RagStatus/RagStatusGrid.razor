@@ -1,0 +1,322 @@
+﻿@using BlazorBootstrap;
+@using DataContext;
+@using DataModel.Enums;
+@using DataService.Auth;
+@using DataService.Interfaces.Management;
+@using DataService.Interfaces.ProjectManagement
+@using DataService.State;
+@using System.Globalization;
+@using System.Text.RegularExpressions;
+@using Website.Client.Pages.SystemManagement.NonworkingDays.Component
+
+@inherits RagStatus
+
+@inject IJSRuntime JSRuntime
+@inject IUserService _userService
+@inject IRagStatusService _ragStatusService
+@inject ILicenseTypeService _licenseTypeService
+@inject IProjectService _projectService
+
+@inject AuthService _authService
+
+@inject NavigationManager uriHelper;
+
+@inject ChangedState changedState
+
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <div class="row">
+            <div class="col-3">
+                <InputSelect class="form-select" @bind-Value="filterProject">
+                    <option selected value=-1 disabled>Seleccione</option>
+                    @foreach (var u in _projects.Where(u => u.Active).OrderBy(x => x.Name))
+                    {
+                        <option @onclick="OnFilterProjectChanged" value=@u.Id>@u.Name</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-2 d-flex justify-content-start align-items-center">
+                <DateInput Style="display: none" Class="form-control" Disabled="false" TValue="DateOnly" Value="filterDate" ValueExpression="() => filterDate" ValueChanged="async (value) => await OnFilterDateChanged(value)"></DateInput>
+                <span style="text-align: center; vertical-align: middle">
+                    @filterDate.ToString("MMMM", CultureInfo.CreateSpecificCulture("es")).ToUpper() @filterDate.Year
+                </span>
+            </div>
+            <div class="col-1">
+                <Button Style="width: 100%" @onclick="() => ChangeDateLess()">
+                    <span class="oi oi-chevron-left" aria-hidden="true" title="Atras"></span>
+                </Button>
+            </div>
+            <div class="col-1">
+                <Button Style="width: 100%" @onclick="() => ChangeDatePlus()">
+                    <span class="oi oi-chevron-right" aria-hidden="true" title="Adelante"></span>
+                </Button>
+            </div>
+            <div class="col-6">
+            </div>
+            <div class="col-2">
+            </div>
+        </div>
+    </div>
+</div>
+
+<br />
+
+<Grid TItem="DataContext.RagStatus" @ref="grid"
+      Data="_ragStatus"
+      Class="table table-hover table-bordered table-striped text-wrap"
+      AllowSorting="true"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="8"
+      Responsive="true"
+      Unit="Unit.Px">
+
+    <GridColumn TItem="DataContext.RagStatus" TextNoWrap="true" HeaderText="Factor" SortKeySelector="item => item.ProjectName" PropertyName="ProjectName" FilterOperator="FilterOperator.Contains">
+        @context.ProjectName
+    </GridColumn>
+
+    <GridColumn TItem="DataContext.RagStatus" HeaderText="Factor" SortKeySelector="item => item.FactorName" PropertyName="FactorName" FilterOperator="FilterOperator.Contains">
+        @context.FactorName
+    </GridColumn>
+
+    <GridColumn TItem="DataContext.RagStatus" TextNoWrap="true" HeaderText="Status" Filterable="false">
+        @if (context.CalificationId == (short)RagStatusState.Bueno)
+        {
+            <span class="badge bg-success w-100" style="margin-top: 8px; margin-bottom: 8px">Bueno</span>
+        }
+        else if (context.CalificationId == (short)RagStatusState.Regular)
+        {
+            <span class="badge bg-warning w-100" style="margin-top: 8px; margin-bottom: 8px">Regular</span>
+        }
+        else if (context.CalificationId == (short)RagStatusState.Malo)
+        {
+            <span class="badge bg-danger w-100" style="margin-top: 8px; margin-bottom: 8px">Malo</span>
+        }
+    </GridColumn>
+
+    <GridColumn TItem="DataContext.RagStatus" HeaderText="Criterios" Filterable="false">
+        @context.Factor.Description
+    </GridColumn>
+
+    <GridColumn TItem="DataContext.RagStatus" HeaderText="Objetivo" Filterable="false">
+        @context.Factor.Objetive
+    </GridColumn>
+
+    <GridColumn TItem="DataContext.RagStatus" HeaderText="Evaluación" Filterable="false">
+        @context.Comment
+    </GridColumn>
+
+    <GridColumn TItem="DataContext.RagStatus" TextNoWrap="true" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="row">
+            <div class="col-12 d-flex">
+                <Button @onclick="async () => await OnShowModalClick(context)">
+                    <span class="oi oi-pencil" aria-hidden="true" title="Editar"></span>
+                </Button>
+            </div>
+        </div>
+    </GridColumn>
+</Grid>
+
+
+<Modal @ref="modal" Title="Editar Rag Status" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h4><b>@editRagStatus.Factor.Name</b></h4>
+                <div style="display: none">
+                    @editRagStatus.CalificationId
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-3">
+                Status
+            </div>
+            <div class="col-9">
+                Evaluación
+            </div>
+        </div>
+        <div class="row mt-2">
+              <div class="col-3">
+                <InputSelect class="form-select" @bind-Value="editRagStatus.CalificationId">
+                    <option selected value=-1 disabled>Seleccione</option>
+                    @foreach (RagStatusState v in Enum.GetValues(typeof(RagStatusState)))
+                    {
+                        <option value=@((short)v)>@v</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-9">
+            <textarea class="form-control" @bind="editRagStatus.Comment" rows="4"></textarea>
+            </div>
+
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Cerrar</Button>
+        </div>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="SaveEdit">Guardar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+@code {
+    [Inject] private ToastService ToastService { get; set; }
+    private Grid<DataContext.RagStatus> grid;
+    private Modal modal;
+
+    private DataContext.RagStatus editRagStatus { get; set; } = new DataContext.RagStatus();
+
+    private List<DataContext.RagStatus> _ragStatus = new List<DataContext.RagStatus>();
+    private List<DataContext.RagStatus> _ragStatusComplete = new List<DataContext.RagStatus>();
+
+    private DateOnly filterDate = DateOnly.FromDateTime(DateTime.Today);
+    private long filterProject { get; set; } = -1;
+    private List<Project> _projects { get; set; } = new List<Project>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetGrid();
+        await GetCombo();
+        await base.OnInitializedAsync();
+    }
+
+    private async Task GetGrid()
+    {
+        try
+        {
+            _ragStatusComplete = await _ragStatusService.GetAsync();
+
+            if (_authService.User.ProfileId != (long)ProfileTypes.Administrador)
+            {
+                var projects = _authService.User.UserTeams.Select(x => x.Team).SelectMany(x => x.Projects).ToList();
+
+                _ragStatusComplete = _ragStatusComplete.Where(x => projects.Any(y => y.Id == x.ProjectId )).ToList();
+            }
+
+            _ragStatus = _ragStatusComplete;
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task GetCombo()
+    {
+        try
+        {
+            _projects = await _projectService.GetAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task OnShowModalClick(DataContext.RagStatus ragStatus)
+    {
+        editRagStatus = ragStatus;
+        await modal?.ShowAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        editRagStatus = new DataContext.RagStatus();
+
+        await modal?.HideAsync();
+    }
+
+    private async Task SaveEdit()
+    {
+        try
+        {
+            editRagStatus.UserId = _authService.User.Id;
+
+            await _ragStatusService.EditAsync(editRagStatus);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            await OnHideModalClick();
+
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Success,
+                Message = "Acción realizada con exito",
+                Title = "Editar CECO"
+            });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+    }
+
+    private async Task OnFilterDateChanged(DateOnly date)
+    {
+        filterDate = date;
+
+        if (filterProject == -1)
+        {
+            _ragStatus = _ragStatusComplete.Where(x => x.Template.Period.Month == date.Month &&
+            x.Template.Period.Year == date.Year).ToList();
+        }
+        else
+        {
+            _ragStatus = _ragStatusComplete.Where(x => x.Template.Period.Month == date.Month &&
+            x.Template.Period.Year == date.Year && x.ProjectId == filterProject).ToList();
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task OnFilterProjectChanged()
+    {
+        try
+        {
+            if (filterProject == -1)
+            {
+                _ragStatus = _ragStatusComplete.Where(x => x.Template.Period.Month == filterDate.Month &&
+                x.Template.Period.Year == filterDate.Year).ToList();
+            }
+            else
+            {
+                _ragStatus = _ragStatusComplete.Where(x => x.Template.Period.Month == filterDate.Month &&
+                x.Template.Period.Year == filterDate.Year && x.ProjectId == filterProject).ToList();
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private void ChangeDatePlus() => filterDate = filterDate.AddMonths(1);
+    private void ChangeDateLess() => filterDate = filterDate.AddMonths(-1);
+}

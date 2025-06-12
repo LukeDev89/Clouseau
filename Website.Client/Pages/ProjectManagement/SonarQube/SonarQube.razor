@@ -1,0 +1,259 @@
+﻿@page "/admin/sonarqube"
+@using DataModel.Response.SonarQube;
+@using DataService.Auth;
+@using DataService.Interfaces.SonarQube;
+@using System.Globalization;
+@using BlazorBootstrap
+
+@inject AuthService authService
+@inject NavigationManager navigationManager
+@inject ISonarQubeService Connection
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+<style>
+    th {
+        min-width: 150px !important;
+    }
+</style>
+
+<PageTitle>Clouseau - SonarQube</PageTitle>
+
+<h3>SonarQube</h3>
+
+<br />
+
+@if (_qubes == null || _qubes.Count == 0)
+{
+
+}
+else
+{
+    <Grid TItem="SonarQubeResponse"
+          Class="table table-hover table-bordered table-striped"
+          Data="_qubes"
+          AllowSorting="true"
+          AllowFiltering="true"
+          AllowPaging="true"
+          PageSize="8"
+          Responsive="true">
+
+        <GridColumn TItem="SonarQubeResponse" HeaderText="CECO" SortKeySelector="item => item.ProjectName" PropertyName="Name" FilterOperator="FilterOperator.Contains" FilterTextboxWidth="150" Freeze="true" FreezeLeftPosition="0">
+            @context.ProjectName.ToUpper().Replace("_", " ")
+        </GridColumn>
+
+        <GridColumn TItem="SonarQubeResponse" HeaderText="Calidad" Sortable="false" Filterable="false" TextNoWrap="true" Freeze="true" FreezeLeftPosition="150">
+            @foreach (var m in context.Metrics.Measures)
+            {
+                if (m.MetricFormatted.Contains("Quality Status"))
+                {
+                    <div class="row">
+                        <div class="col-12 d-flex">
+                            <div style="text-align: left; vertical-align: middle; display: flex; align-items: center; justify-content: start">
+                                <i class="material-icons" style="font-size:25px; margin: 0; color: @m.Color">@m.Mood</i>
+                            </div> &nbsp;
+                            @m.ValueFormatted
+                        </div>
+                    </div>
+                    break;
+                }
+            }
+        </GridColumn>
+
+        <GridColumn TItem="SonarQubeResponse" HeaderText="Fiabilidad" Sortable="false" Filterable="true" TextNoWrap="true" FilterTextboxWidth="200">
+            @foreach (var m in context.Metrics.Measures)
+            {
+                if (m.Metric.Equals("bugs") || m.Metric.Equals("reliability_rating"))
+                {
+                    <div class="row">
+                        <div class="col-9 d-flex">
+                            <div style="text-align: left; vertical-align: middle; display: flex; align-items: center; justify-content: start">
+                                <i class="material-icons" style="font-size:25px; margin: 0; color: @m.Color">@m.Mood</i>
+                            </div> &nbsp;
+                            @m.MetricFormatted
+                        </div>
+                        <div class="col-3 d-flex">
+                            @m.ValueFormatted
+                        </div>
+                    </div>
+                }
+            }
+        </GridColumn>
+
+        <GridColumn TItem="SonarQubeResponse" HeaderText="Issues" Sortable="false" Filterable="true" TextNoWrap="true" FilterTextboxWidth="150">
+            @foreach (var m in context.Metrics.Measures)
+            {
+                if (m.Metric.Equals("violations"))
+                {
+                    <div class="row">
+                        <div class="col-9 d-flex">
+                            <div style="text-align: left; vertical-align: middle; display: flex; align-items: center; justify-content: start">
+                                <i class="material-icons" style="font-size:25px; margin: 0; color: @m.Color">@m.Mood</i>
+                            </div> &nbsp;
+                            @m.MetricFormatted
+                        </div>
+                        <div class="col-3 d-flex">
+                            @m.ValueFormatted
+                        </div>
+                    </div>
+                }
+            }
+        </GridColumn>
+
+        <GridColumn TItem="SonarQubeResponse" HeaderText="Duplicaciones" Sortable="false" Filterable="true" TextNoWrap="true" FilterTextboxWidth="250">
+            @foreach (var m in context.Metrics.Measures)
+            {
+                if (m.Metric.Equals("duplicated_lines_density") || m.Metric.Equals("duplicated_blocks"))
+                {
+                    <div class="row">
+                        <div class="col-9 d-flex">
+                            <div style="text-align: left; vertical-align: middle; display: flex; align-items: center; justify-content: start">
+                                <i class="material-icons" style="font-size:25px; margin: 0; color: @m.Color">@m.Mood</i>
+                            </div> &nbsp;
+                            @m.MetricFormatted
+                        </div>
+                        <div class="col-3 d-flex">
+                            @m.ValueFormatted
+                        </div>
+                    </div>
+                }
+            }
+        </GridColumn>
+
+        <GridColumn TItem="SonarQubeResponse" HeaderText="Mantenibilidad" Sortable="false" Filterable="true" TextNoWrap="true" FilterTextboxWidth="200">
+            @foreach (var m in context.Metrics.Measures)
+            {
+                if (m.Metric.Equals("code_smells") || m.Metric.Equals("sqale_rating") || m.Metric.Equals("sqale_index") || m.Metric.Equals("sqale_debt_ratio"))
+                {
+                    <div class="row">
+                        <div class="col-9 d-flex">
+                            <div style="text-align: left; vertical-align: middle; display: flex; align-items: center; justify-content: start">
+                                <i class="material-icons" style="font-size:25px; margin: 0; color: @m.Color">@m.Mood</i>
+                            </div> &nbsp;
+                            @m.MetricFormatted
+                        </div>
+                        <div class="col-3 d-flex">
+                            @m.ValueFormatted
+                        </div>
+                    </div>
+                }
+            }
+        </GridColumn>
+
+        <GridColumn TItem="SonarQubeResponse" HeaderText="Seguridad" Sortable="false" Filterable="true" TextNoWrap="true" FilterTextboxWidth="200">
+            @foreach (var m in context.Metrics.Measures)
+            {
+                if (m.Metric.Equals("vulnerabilities") || m.Metric.Equals("security_rating"))
+                {
+                    <div class="row">
+                        <div class="col-9 d-flex">
+                            <div style="text-align: left; vertical-align: middle; display: flex; align-items: center; justify-content: start">
+                                <i class="material-icons" style="font-size:25px; margin: 0; color: @m.Color">@m.Mood</i>
+                            </div> &nbsp;
+                            @m.MetricFormatted
+                        </div>
+                        <div class="col-3 d-flex">
+                            @m.ValueFormatted
+                        </div>
+                    </div>
+                }
+            }
+        </GridColumn>
+
+        <GridColumn TItem="SonarQubeResponse" HeaderText="Test" Sortable="false" Filterable="true" TextNoWrap="true" FilterTextboxWidth="150">
+            
+            @foreach (var m in context.Metrics.Measures)
+            {
+                if (m.MetricFormatted.Contains("Quality Status")) continue;
+                if (m.Metric.Equals("bugs") || m.Metric.Equals("reliability_rating")) continue;
+                if (m.Metric.Equals("code_smells") || m.Metric.Equals("sqale_rating") || m.Metric.Equals("sqale_index") || m.Metric.Equals("sqale_debt_ratio")) continue;
+                if (m.Metric.Equals("vulnerabilities") || m.Metric.Equals("security_rating")) continue;
+                if (m.Metric.Equals("duplicated_lines_density") || m.Metric.Equals("duplicated_blocks")) continue;
+                if (m.Metric.Equals("violations")) continue;
+
+                <div class="row">
+                    <div class="col-9 d-flex align-items-center">
+                        <div style="text-align: left; vertical-align: middle; display: flex; align-items: center; justify-content: start">
+                            <i class="material-icons" style="font-size:25px; margin: 0; color: @m.Color">@m.Mood</i>
+                        </div> &nbsp;
+                        @m.MetricFormatted
+                    </div>
+                    <div class="col-3 d-flex">
+                        @m.ValueFormatted
+                    </div>
+                </div>
+            }
+        </GridColumn>
+    </Grid>
+
+}
+
+<script suppress-error="BL9992">
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    })
+
+</script>
+
+@code {
+    [Inject] protected PreloadService PreloadService { get; set; }
+    [Inject] ToastService ToastService { get; set; }
+
+    private List<SonarQubeResponse> _qubes = new List<SonarQubeResponse>();
+
+    private DateTime fechaDesde = DateTime.Now;
+    private DateTime fechaHasta = DateTime.Now;
+
+    private bool _errorOccurred = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            PreloadService.Show();
+            _qubes = await Connection.GetSonarQubeMetrics();
+        }
+        catch (Exception ex)
+        {
+            _errorOccurred = true;
+        }
+        finally
+        {
+            PreloadService.Hide();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (_errorOccurred)
+            {
+                await localStorage.ClearAsync();
+
+                ToastService.Notify(new ToastMessage()
+                    {
+                        Type = ToastType.Danger,
+                        Message = "Error inesperado al realizar la acción",
+                        Title = "Error"
+                    });
+
+                navigationManager.NavigateTo("/");
+
+            }
+            else
+            {
+                if (!authService.IsLoggedIn)
+                {
+                    navigationManager.NavigateTo("/");
+                }
+                else
+                {
+                    var uri = navigationManager.Uri;
+                    await localStorage.SetItemAsync("lastUrl", uri);
+                    await localStorage.SetItemAsync("huboRecarga", false);
+                }
+            }
+        }
+    }
+}

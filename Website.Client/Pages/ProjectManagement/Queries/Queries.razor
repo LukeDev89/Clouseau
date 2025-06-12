@@ -1,0 +1,170 @@
+﻿@page "/project/queries"
+@using BlazorBootstrap;
+@using DataService.Auth;
+
+@inject AuthService authService
+@inject NavigationManager navigationManager
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+<h3>Consultas</h3>
+
+<br />
+
+<div class="row custom-container" style="padding: 20px !important">
+    <div class="col-12">
+        <Button Class="btn btn-primary w-100" @onclick="LoadExtraHoursPerUser">Horas Extra por Usuario</Button>
+        @if (showExtraHoursPerUser)
+        {
+            <br/>
+            <br/>
+            <ExtraHoursPerUser />
+        }
+    </div>
+</div>
+
+<br />
+
+<div class="row custom-container" style="padding: 20px !important">
+    <div class="col-12">
+        <Button Class="btn btn-primary w-100" @onclick="LoadLicensesPerUser">Licencias por Usuario</Button>
+        @if (showLicensesPerUser)
+        {
+            <br/>
+            <br/>
+            <LicensesPerUser />
+        }
+    </div>
+</div>
+
+<br />
+
+<div class="row custom-container" style="padding: 20px !important">
+    <div class="col-12">
+        <Button Class="btn btn-primary w-100" @onclick="LoadHourPerTaskPerUser">Horas por Tarea por Usuario</Button>
+        @if (showHourPerTaskPerUser)
+        {
+            <br />
+            <br />
+            <HourPerTaskPerUser />
+        }
+    </div>
+</div>
+
+<br />
+
+<div class="row custom-container" style="padding: 20px !important">
+    <div class="col-12">
+        <Button Class="btn btn-primary w-100" @onclick="LoadPlanillaSenamal">Planilla Semanal de Servicio</Button>
+        @if (showPlanillaSemanal)
+        {
+            <br />
+            <br />
+            <PlanillaSemanalServicio />
+        }
+    </div>
+</div>
+
+@* <br />
+
+<div class="row custom-container" style="padding: 20px !important">
+    <div class="col-12">
+        <Button Class="btn btn-primary w-100" @onclick="LoadHourPerProjectPerUser">Horas por Proyecto por Usuario</Button>
+        @if (showHourPerProjectPerUser)
+        {
+            <br />
+            <br />
+            <HourPerProjectPerUser />
+        }
+    </div>
+</div> *@
+
+<br />
+<br />
+
+@code {
+    [Inject] ToastService ToastService { get; set; }
+    [Inject] protected PreloadService PreloadService { get; set; }
+
+    private bool _errorOccurred = false;
+
+    private bool showExtraHoursPerUser = false;
+    private bool showLicensesPerUser = false;
+    private bool showHourPerTaskPerUser = false;
+    private bool showHourPerProjectPerUser = false;
+    private bool showPlanillaSemanal = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            PreloadService.Show();
+            await base.OnInitializedAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorOccurred = true;
+        }
+        finally
+        {
+            PreloadService.Hide();
+        }
+    }
+
+    private void LoadExtraHoursPerUser()
+    {
+        showExtraHoursPerUser = !showExtraHoursPerUser;
+    }
+    
+    private void LoadLicensesPerUser()
+    {
+        showLicensesPerUser = !showLicensesPerUser;
+    }
+
+    private void LoadHourPerTaskPerUser()
+    {
+        showHourPerTaskPerUser = !showHourPerTaskPerUser;
+    }
+
+    private void LoadHourPerProjectPerUser()
+    {
+        showHourPerProjectPerUser = !showHourPerProjectPerUser;
+    }
+
+    private void LoadPlanillaSenamal()
+    {
+        showPlanillaSemanal = !showPlanillaSemanal;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (_errorOccurred)
+            {
+                await localStorage.ClearAsync();
+
+                ToastService.Notify(new ToastMessage()
+                    {
+                        Type = ToastType.Danger,
+                        Message = "Error inesperado al realizar la acción",
+                        Title = "Error"
+                    });
+
+                navigationManager.NavigateTo("/");
+            }
+            else
+            {
+                if (!authService.IsLoggedIn)
+                {
+                    navigationManager.NavigateTo("/");
+                }
+                else
+                {
+                    var uri = navigationManager.Uri;
+                    await localStorage.SetItemAsync("lastUrl", uri);
+                    await localStorage.SetItemAsync("huboRecarga", false);
+                }
+            }
+        }
+    }
+}

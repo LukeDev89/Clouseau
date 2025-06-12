@@ -1,0 +1,284 @@
+﻿@using BlazorBootstrap
+@using DataService.Interfaces.Management;
+@using DataService.State;
+@using DataContext;
+
+@inherits Clients
+
+@inject IClientService _service
+
+@inject ChangedState changedState
+
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleContentAsync">
+            Crear Cliente
+        </Button>
+    </div>
+</div>
+<Collapse @ref="collapseAgregar">
+    <Card>
+        <CardBody>
+            <div class="row">
+                <div class="col-8">
+                    Nombre
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-8">
+                    <InputText Class="form-control" @bind-Value="@createClient.Name"></InputText>
+                </div>
+
+                <div class="col-4">
+                    <div class="row">
+                        <div class="col-6">
+                            <Button Class="btn btn-secondary form-control" onclick="@(() => CancelAdd())">
+                                Limpiar
+                            </Button>
+                        </div>
+                        <div class="col-6">
+                            <Button Class="btn btn-primary form-control" onclick="@(() => SaveAdd())">
+                                Crear
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </CardBody>
+    </Card>
+</Collapse>
+
+<br />
+<br />
+
+<Grid TItem="Client" @ref="grid"
+      Class="table table-hover table-bordered table-striped"
+      Data="_clients"
+      AllowSorting="true"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="8"
+      Responsive="true">
+
+    <GridColumn TItem="Client" HeaderText="Nombre" SortKeySelector="item => item.Name" PropertyName="Name" FilterOperator="FilterOperator.Contains">
+        @context.Name
+    </GridColumn>
+
+    <GridColumn TItem="Client" HeaderText="Alta" SortKeySelector="item => item._Income" PropertyName="_Income" FilterOperator="FilterOperator.Equals">
+        @context.Income.ToString("dd/MM/yyyy")
+    </GridColumn>
+
+    <GridColumn TItem="Client" HeaderText="Baja" SortKeySelector="item => item._Outcome" PropertyName="_Outcome" FilterOperator="FilterOperator.Equals">
+        @context.Outcome?.ToString("dd/MM/yyyy")
+    </GridColumn>
+
+    <GridColumn TItem="Client" HeaderText="Activo" SortKeySelector="item => item.Active" PropertyName="Active" FilterOperator="FilterOperator.Equals">
+        @if (context.Active)
+        {
+            <span class="oi oi-circle-check" aria-hidden="true" style="color: var(--l-green)"></span>
+        }
+        else
+        {
+            <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-red)"></span>
+        }
+    </GridColumn>
+    <GridColumn TItem="Client" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="row">
+            <div class="col-12 d-flex">
+                <Button @onclick="async () => await OnShowModalClick(context)">
+                    <span class="oi oi-pencil" aria-hidden="true" title="Editar"></span>
+                </Button>
+
+                <Button @onclick="async () => await SaveDelete(context.Id)">
+                    <span class="oi oi-circle-x" aria-hidden="true" title="Eliminar" style="color: var(--l-red)"></span>
+                </Button>
+            </div>
+        </div>
+    </GridColumn>
+</Grid>
+
+<Modal @ref="modal" Title="Notificación" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h4><b>@editClient.Name</b></h4>
+            </div>
+        </div>
+        <div class="row" style="margin-top: 25px">
+            <div class="col-6">
+                Nombre
+            </div>
+            <div class="col-3">
+                Activo
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-6">
+                <InputText Class="form-control" @bind-Value="@editClient.Name"></InputText>
+            </div>
+            <div class="col-3">
+                <InputSelect class="form-select" @bind-Value="editClient.Active">
+                    <option value=false>No</option>
+                    <option value=true>Si</option>
+                </InputSelect>
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Cerrar</Button>
+        </div>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="SaveEdit">Guardar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+@code {
+    [Inject] ToastService ToastService { get; set; }
+    private Collapse collapseAgregar;
+    private Grid<Client> grid;
+
+    private Modal modal;
+    private long modalId { get; set; }
+    private string modalName { get; set; } = "";
+    private Client editClient { get; set; } = new Client ();
+
+    private Client createClient { get; set; } = new Client ();
+
+    private List<Client> _clients = new List<Client>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetGrid();
+        await base.OnInitializedAsync();
+    }
+
+    private async Task GetGrid()
+    {
+        try
+        {
+            _clients = await _service.GetAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+    }
+
+    private async Task SaveAdd()
+    {
+        try
+        {
+            await _service.AddAsync(createClient);
+            await GetGrid();
+            await grid.RefreshDataAsync();
+
+            changedState.InitChanges();
+
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Success,
+                Message = "Cliente guardado con exito.",
+                Title = "Cliente Guardado"
+            });
+
+            CancelAdd();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+    }
+
+    private void CancelAdd()
+    {
+        createClient.Name = "";
+    }
+
+    private async Task SaveEdit()
+    {
+        try
+        {
+            await _service.EditAsync(editClient);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            await OnHideModalClick();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Cliente editado con exito.",
+                    Title = "Cliente Editado"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+
+    }
+
+    private async Task SaveDelete(long Id)
+    {
+        try
+        {
+            await _service.DeleteAsync(Id);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            await OnHideModalClick();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Cliente eliminado con exito.",
+                    Title = "Cliente Eliminado"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+    }
+
+    private async Task OnShowModalClick(Client client)
+    {
+        editClient = client;
+
+        await modal?.ShowAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        editClient.Id = 0;
+        editClient.Name = "";
+
+        await modal?.HideAsync();
+    }
+
+    private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
+}

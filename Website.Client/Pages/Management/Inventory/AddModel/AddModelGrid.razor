@@ -1,0 +1,250 @@
+﻿@using BlazorBootstrap;
+@using DataContext;
+@using DataModel.Enums;
+@using DataService.Auth;
+@using DataService.Interfaces.Management;
+@using DataService.State;
+@using System.Globalization;
+@using System.Text.RegularExpressions;
+
+@inherits AddModel
+
+@inject IJSRuntime JSRuntime
+@inject IAddModelService _AddModelService
+@inject IAddBrandService _AddBrandService
+
+@inject AuthService _authService
+
+@inject NavigationManager uriHelper;
+
+@inject ChangedState changedState
+
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleContentAsync">Crear Nuevo Modelo</Button>
+    </div>
+</div>
+
+<Collapse @ref="collapseAgregar" Class="custom-container">
+    <Card>
+        <CardBody>
+            <div class="row">
+                <div class="col-4">
+                    Marca
+                </div>
+                <div class="col-4">
+                    Modelo
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-4">
+                    <InputSelect class="form-select" @bind-Value="editAddModel.BrandId">
+                        <option value="-1" disabled="@(addBrand.Id != -1)">Seleccione</option>
+                        @foreach (var p in _Brands)
+                        {
+                            <option value="@p.Id">@p.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-4">
+                    <InputText class="form-control" @bind-Value="editAddModel.Name"></InputText>
+                </div>
+                <div class="col-2">
+                    <Button class="btn form-control" Color="ButtonColor.Secondary" onclick="@(() => CancelAdd())">
+                        Limpiar
+                    </Button>
+                </div>
+                <div class="col-2">
+                    <Button class="btn form-control" Color="ButtonColor.Primary" onclick="@(() => SaveAdd())">
+                        Crear
+                    </Button>
+                </div>
+            </div>
+        </CardBody>
+    </Card>
+</Collapse>
+
+<br />
+<br />
+
+<Grid TItem="DataContext.InventoryModel" @ref="grid"
+      Data="_Models"
+      Class="table table-hover table-bordered table-striped text-nowrap"
+      AllowSorting="true"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="8"
+      Responsive="true"
+      Unit="Unit.Px">
+
+    <GridColumn TItem="DataContext.InventoryModel" HeaderText="Modelos Agregados" SortKeySelector="item => item.Name" PropertyName="Name" FilterOperator=" FilterOperator.Contains">
+        @context.Name
+    </GridColumn>
+
+    <GridColumn TItem="DataContext.InventoryModel" HeaderText="Marca Asignada" SortKeySelector="item => item.Name" PropertyName ="Name" FilterOperator="FilterOperator.Contains">
+        @context.BrandName
+    </GridColumn>
+
+    <GridColumn TItem="DataContext.InventoryModel" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="row">
+            <div class="col-12 d-flex">               
+                <Button @onclick="async () => await SaveDefinitiveDelete(context.Id)">
+                    <span class="oi oi-trash" aria-hidden="true" title="Eliminar"></span>
+                </Button>
+            </div>
+        </div>
+    </GridColumn>
+</Grid>
+
+<ConfirmDialog @ref="dialog" />
+
+@code
+{
+    [Inject] ToastService ToastService { get; set; }
+    private ConfirmDialog dialog;
+    private Collapse collapseAgregar;
+    private Grid<DataContext.InventoryModel> grid;
+
+    private Modal modalSuperLupa;
+
+    public long modalTaskId { get; set; }
+
+    private DataContext.Inventory newInventory { get; set; } = default!;
+    private DataContext.Inventory editInventory { get; set; } = default!;
+
+    private DataContext.InventoryModel editAddModel { get; set; } = new InventoryModel();
+
+    private DataContext.InventoryBrand addBrand { get; set; } = new DataContext.InventoryBrand();
+
+    private List<DataContext.InventoryModel> _Models = new List<DataContext.InventoryModel>();
+    private List<DataContext.InventoryBrand> _Brands = new List<DataContext.InventoryBrand>();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await GetCombos();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        changedState.ChangeAction += StateHasChanged;
+        await GetGrid();
+        await GetCombos();
+        await base.OnInitializedAsync();
+    }
+
+    public void Dispose()
+    {
+        changedState.ChangeAction -= StateHasChanged;
+    }
+
+    private async Task GetCombos()
+    {
+        try
+        {
+            _Brands = await _AddBrandService.GetBrands();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task GetGrid()
+    {
+        try
+        {
+            _Models = (await _AddModelService.GetAsync()).OrderBy(x => x.Name).ToList();            
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveAdd()
+    {
+        try
+        {
+
+            await _AddModelService.AddAsync(editAddModel);
+            editAddModel = new InventoryModel();
+            StateHasChanged();
+            changedState.InitChanges();
+            await GetGrid();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con exito",
+                    Title = "Agregar Modelo"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    } 
+
+    private void CancelAdd()
+    {
+        editAddModel.BrandId = -1;       
+        editAddModel.Name = "";
+    }
+    
+    
+
+    private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
+   
+    private async Task SaveDefinitiveDelete(long Id) 
+    {
+        try
+        {
+            await _AddModelService.DefinitiveDeleteAsync(Id);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Eliminar Modelo "
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error al borrar modelo ",
+                    Title = "Error"
+                });
+        }
+    }
+
+    protected override void OnInitialized() 
+    {
+        
+        addBrand.Id = -1;
+        base.OnInitialized();
+    }
+
+}

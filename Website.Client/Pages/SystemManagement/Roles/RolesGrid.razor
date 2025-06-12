@@ -1,0 +1,312 @@
+﻿@using BlazorBootstrap
+@using DataContext
+@using DataService.Interfaces.Management;
+@using DataService.State;
+
+@inherits Roles
+
+@inject IRoleService _service
+
+@inject ChangedState changedState
+
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleContentAsync">
+            Crear Rol
+        </Button>
+    </div>
+</div>
+<Collapse @ref="collapseAgregar">
+    <Card>
+        <CardBody>
+            <div class="row">
+                <div class="col-2">
+                    Nombre
+                </div>
+                <div class="col-4">
+                    Descripción
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-2">
+                    <InputText Class="form-control" @bind-Value="@createRole.Name"></InputText>
+                </div>
+                <div class="col-4">
+                    <InputText Class="form-control" @bind-Value="@createRole.Description"></InputText>
+                </div>
+                <div class="col-2">
+                    <InputNumber Class="form-control" Min="1" Max="99" Step="0.01" @bind-Value="@createRole.Hierarchy"></InputNumber>
+                </div>
+                <div class="col-4">
+                    <div class="row">
+                        <div class="col-6">
+                            <Button Class="btn btn-secondary form-control" onclick="@(() => CancelAdd())">
+                                Limpiar
+                            </Button>
+                        </div>
+                        <div class="col-6">
+                            <Button Class="btn btn-primary form-control" onclick="@(() => SaveAdd())">
+                                Crear
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </CardBody>
+    </Card>
+</Collapse>
+
+<br />
+<br />
+
+<Grid TItem="Role" @ref="grid"
+      Class="table table-hover table-bordered table-striped"
+      Data="_roles"
+      AllowSorting="true"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="8"
+      Responsive="true">
+
+    <GridColumn TItem="Role" HeaderText="Nombre" SortKeySelector="item => item.Name" PropertyName="Name" FilterOperator="FilterOperator.Contains">
+        @context.Name
+    </GridColumn>
+
+    <GridColumn TItem="Role" HeaderText="Descripción" SortKeySelector="item => item.Description" PropertyName="Description" FilterOperator="FilterOperator.Contains">
+        @context.Description
+    </GridColumn>
+
+    <GridColumn TItem="Role" HeaderText="Jerarquía" SortKeySelector="item => item.Hierarchy" PropertyName="Hierarchy" FilterOperator="FilterOperator.Equals" TextAlignment="Alignment.End">
+        @context.Hierarchy
+    </GridColumn>
+
+    <GridColumn TItem="Role" HeaderText="Activo" SortKeySelector="item => item.Active" PropertyName="Active" FilterOperator="FilterOperator.Equals">
+        @if (context.Active)
+        {
+            <span class="oi oi-circle-check" aria-hidden="true" style="color: var(--l-green)"></span>
+        }
+        else
+        {
+            <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-red)"></span>
+        }
+    </GridColumn>
+
+    <GridColumn TItem="Role" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="row">
+            <div class="col-12 d-flex">
+                <Button @onclick="async () => await OnShowModalClick(context)">
+                    <span class="oi oi-pencil" aria-hidden="true" title="Editar"></span>
+                </Button>
+
+                <Button @onclick="async () => await SaveDelete(context.Id)">
+                    <span class="oi oi-circle-x" aria-hidden="true" title="Eliminar" style="color: var(--l-red)"></span>
+                </Button>
+            </div>
+        </div>
+    </GridColumn>
+</Grid>
+
+<Modal @ref="modal" Title="Notificación" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h4><b>@modalName</b></h4>
+            </div>
+        </div>
+        <div class="row" style="margin-top: 25px">
+            <div class="col-3">
+                Nombre
+            </div>
+            <div class="col-4">
+                Descripcion
+            </div>
+            <div class="col-2">
+                Jerarquía
+            </div>
+            <div class="col-3">
+                Activo
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-3">
+                <InputText Class="form-control" @bind-Value="@editRole.Name"></InputText>
+            </div>
+            <div class="col-4">
+                <InputText Class="form-control" @bind-Value="@editRole.Description"></InputText>
+            </div>
+            <div class="col-2">
+                <InputNumber Class="form-control" Min="1" Max="99" Step="0.01" @bind-Value="@editRole.Hierarchy"></InputNumber>
+            </div>
+            <div class="col-3">
+                <InputSelect class="form-select" @bind-Value="editRole.Active">
+                    <option value=false>No</option>
+                    <option value=true>Si</option>
+                </InputSelect>
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Cerrar</Button>
+        </div>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="SaveEdit">Guardar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+@code {
+    [Inject] ToastService ToastService { get; set; }
+    private Collapse collapseAgregar;
+    private Grid<Role> grid;
+
+    private Modal modal;
+    private long modalId { get; set; }
+    private string modalName { get; set; } = "";
+    private string modalDescription { get; set; } = "";
+    private int modalHierarchy { get; set; } = 1;
+    private int modalActive { get; set; } = -1;
+    private Role editRole { get; set; } = new Role();
+
+    private string createName { get; set; } = "";
+    private string createDescription { get; set; } = "";
+    private Role createRole { get; set; } = new Role();
+
+
+    private List<Role> _roles = new List<Role>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetGrid();
+        await base.OnInitializedAsync();
+    }
+
+    private async Task GetGrid()
+    {
+        try
+        {
+            _roles = await _service.GetAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveAdd()
+    {
+        try
+        {
+            await _service.AddAsync(createRole);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            CancelAdd();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Crear Rol"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private void CancelAdd()
+    {
+        createRole.Name = "";
+        createRole.Description = "";
+    }
+
+    private async Task SaveEdit()
+    {
+        try
+        {
+            await _service.EditAsync(editRole);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            await OnHideModalClick();
+
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Guardar Rol"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveDelete(long Id)
+    {
+        try
+        {
+            await _service.DeleteAsync(Id);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            await OnHideModalClick();
+
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Eliminar Rol"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task OnShowModalClick(Role role)
+    {
+        editRole = role;
+
+        await modal?.ShowAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        editRole.Id = 0;
+        editRole.Name = "";
+        editRole.Description = "";
+
+        await modal?.HideAsync();
+    }
+
+    private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
+}

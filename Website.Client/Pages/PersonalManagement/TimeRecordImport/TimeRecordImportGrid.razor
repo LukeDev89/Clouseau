@@ -1,0 +1,520 @@
+﻿@using BlazorBootstrap
+@using DataContext
+@using DataModel.Dto;
+@using DataModel.Enums
+@using DataModel.Request;
+@using DataService.Auth;
+@using DataService.Interfaces.Management;
+@using System.Globalization;
+@using DataService.Interfaces.ProjectManagement;
+
+@inherits TimeRecordImport
+
+@inject IProjectService _projectService
+@inject IProjectTaskService _projectTaskService
+@inject IClientService _clientService
+@inject ITaskTypeService _taskTypeService
+@inject ITaskProgressService _taskProgressService
+@inject IUserService _userService
+
+@inject AuthService _authService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+@inject NavigationManager navigationManager;
+
+<div class="row">
+    <div class="col-12">
+        <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleContentAsync">Importar Archivo</Button>
+    </div>
+</div>
+
+<Collapse @ref="collapseAgregar" Class="custom-container">
+    <Card>
+        <CardBody>
+            <div class="row">
+                <div class="col-3">
+                    Cliente
+                </div>
+                <div class="col-3">
+                    Proyecto
+                </div>
+                <div class="col-6">
+                    Archivo
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-3">
+                    <InputSelect class="form-select" @bind-Value="_clientId">
+                        <option selected value=-1 disabled>Seleccione</option>
+                        @foreach (var p in _clients)
+                        {
+                            <option value=@p.Id>@p.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-3">
+                    <InputSelect class="form-select" @bind-Value="_projectId">
+                        <option selected value=-1 disabled>Seleccione</option>
+                        @foreach (var p in _projects)
+                        {
+                            <option value=@p.Id>@p.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-6">
+                    <InputFile OnChange="@LoadFile" class="form-control" />
+                </div>
+            </div>
+            <br />
+            <div class="row">
+                <div class="col-6">
+                </div>
+                <div class="col-6">
+                    <div class="row">
+                        <div class="col-6"></div>
+                        <div class="col-3">
+                            <Button Class="btn btn-secondary form-control" onclick="@(() => CancelAdd())">
+                                Limpiar
+                            </Button>
+                        </div>
+                        <div class="col-3">
+                            <Button Class="btn btn-primary form-control" onclick="@(() => SaveAdd())">
+                                Crear
+                            </Button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </CardBody>
+    </Card>
+</Collapse>
+
+<br />
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <div class="row">
+            <div class="col-2 d-flex justify-content-start align-items-center">
+                <DateInput Style="display: none" Class="form-control" Disabled="false" TValue="DateOnly" Value="filterDate" ValueExpression="() => filterDate" ValueChanged="async (value) => await OnFilterDateChanged(value)"></DateInput>
+                <span style="text-align: center; vertical-align: middle">
+                    @filterDate.ToString("MMMM", CultureInfo.CreateSpecificCulture("es")).ToUpper() @filterDate.Year
+                </span>
+            </div>
+            <div class="col-1">
+                <Button Style="width: 100%" @onclick="() => ChangeDateLess()">
+                    <span class="oi oi-chevron-left" aria-hidden="true" title="Atras"></span>
+                </Button>
+            </div>
+            <div class="col-1">
+                <Button Style="width: 100%" @onclick="() => ChangeDatePlus()">
+                    <span class="oi oi-chevron-right" aria-hidden="true" title="Adelante"></span>
+                </Button>
+            </div>
+            <div class="col-6">
+            </div>
+            <div class="col-2">
+            </div>
+        </div>
+    </div>
+</div>
+
+<br />
+
+<Grid TItem="ProjectTask" @ref="grid"
+      Data="_projectTaskToShow"
+      Class="table table-hover table-bordered table-striped text-nowrap"
+      AllowSorting="true"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="20"
+      Responsive="true"
+      Unit="Unit.Px">
+
+    <GridColumn TItem="ProjectTask" HeaderText="Nombre" Freeze="true" FreezeLeftPosition="0" TextNoWrap="true" SortKeySelector="item => item.Name" PropertyName="Name" FilterOperator="FilterOperator.Contains">
+        @context.Name
+    </GridColumn>
+    
+    <GridColumn TItem="ProjectTask" HeaderText="CECO" SortKeySelector="item => item.ProjectName" PropertyName="ProjectName" FilterOperator="FilterOperator.Contains">
+        @context.ProjectName
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="Descripción" TextNoWrap="true" SortKeySelector="item => item.Description" PropertyName="Description" FilterOperator="FilterOperator.Contains">
+        @context.Description
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="Horas" TextAlignment="Alignment.End" Sortable="false" PropertyName="Completed" Filterable="false">
+        @context.TaskProgresses.Sum(x => x.Hours)
+
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="Periodo" SortKeySelector="item => item._CreationDate" PropertyName="_Date" Filterable="false">
+        @context._CreationDate.ToString("MM/yyyy")
+    </GridColumn>
+</Grid>
+
+@code {
+    [Inject] ToastService ToastService { get; set; }
+    [Inject] protected PreloadService PreloadService { get; set; }
+
+    private Collapse collapseAgregar;
+    private Grid<ProjectTask> grid = default!;
+    private Button buttonSave = default!;
+
+    private List<ProjectTask> _projectTask = new List<ProjectTask>();
+    private List<ProjectTask> _projectTaskToShow = new List<ProjectTask>();
+
+    private List<Client> _clients = new List<Client>();
+    private long _clientId = -1;
+    private List<Project> _projects = new List<Project>();
+    private long _projectId = -1;
+
+    private List<TaskProgress> _taskProgress = new List<TaskProgress>();
+    private List<TaskType> _taskTypes = new List<TaskType>();
+
+    private List<HoursPerDayModel> _workDays = new List<HoursPerDayModel>();
+    private List<HoursPerDayModel> _workDaysToShow = new List<HoursPerDayModel>();
+
+    private List<HoursPerTaskPerDayModel> _workPerTask = new List<HoursPerTaskPerDayModel>();
+    private List<HoursPerTaskPerDayModel> _workPerTaskToShow = new List<HoursPerTaskPerDayModel>();
+    private List<DateOnly> _daysToShow = new List<DateOnly>();
+
+    private IBrowserFile createFile;
+    private const int MAX_WEIGHT_FILE_IN_MB = 5;
+
+    private bool taskTypeDisabled { get; set; }
+    private bool dateToDisabled { get; set; }
+
+    private DateOnly filterDate = DateOnly.FromDateTime(DateTime.Today);
+
+    private bool _errorOccurred = false;
+    private DateOnly _firstDayOfMonth = new DateOnly(DateTime.Now.Year, DateTime.Now.Month, 1);
+
+    private bool preventDoubleClick { get; set; } = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (_errorOccurred)
+            {
+                await localStorage.ClearAsync();
+
+                ToastService.Notify(new ToastMessage()
+                    {
+                        Type = ToastType.Danger,
+                        Message = "Error inesperado al realizar la acción",
+                        Title = "Error"
+                    });
+
+                navigationManager.NavigateTo("/");
+            }
+            else
+            {
+                if (!_authService.IsLoggedIn)
+                {
+                    navigationManager.NavigateTo("/");
+                }
+                else
+                {
+                    var uri = navigationManager.Uri;
+                    await localStorage.SetItemAsync("lastUrl", uri);
+                    await localStorage.SetItemAsync("huboRecarga", false);
+                }
+            }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            PreloadService.Show();
+            await GetGrid();
+            await GetCombo();
+            await base.OnInitializedAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorOccurred = true;
+        }
+        finally
+        {
+            PreloadService.Hide();
+        }
+    }
+
+    private async Task GetCombo()
+    {
+        _taskTypes = await _taskTypeService.GetAsync();
+        _clients = await _clientService.GetAsync();
+        _projects = await _projectService.GetAsync();
+    }
+
+    private async Task GetGrid()
+    {
+        try
+        {
+            // _projectTask = await _projectTaskService.GetByUserIdAsync(_authService.User.Id);
+            // _workDays = await _projectTaskService.UserCalendar(_authService.User.Id);
+            // _workPerTask = await _projectTaskService.UserCalendarPerTask(_authService.User.Id);
+
+            CalculateTables();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private void LoadFile(InputFileChangeEventArgs e)
+    {
+        createFile = e.File;
+    }
+
+    private void CalculateTables()
+    {
+        // _projectTaskToShow = _projectTask.Where(x =>
+        //     ((x.CreationDate.Month == filterDate.Month && x.CreationDate.Year == filterDate.Year) ||
+        //     (!x.Finished && DateOnly.FromDateTime(x.CreationDate) <= filterDate)) ).ToList();
+
+        // _workPerTaskToShow = _workPerTask.Where(x => x.Date.Month == filterDate.Month && x.Date.Year == filterDate.Year).OrderBy(x => x.Date).ToList();
+
+        // _workDaysToShow = _workDays.Where(x => x.Date.Month == filterDate.Month && x.Date.Year == filterDate.Year).ToList();
+        // _daysToShow = _workDays.Select(x => x.Date).Where(x => x.Month == filterDate.Month && x.Year == filterDate.Year).Distinct().OrderBy(x => x).ToList();
+    }
+
+    private async Task OnFilterDateChanged(DateOnly date)
+    {
+        filterDate = date;
+
+        CalculateTables();
+
+        if (grid != null)
+        {
+            await grid.RefreshDataAsync();
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task SaveAdd()
+    {
+        try
+        {
+            string? fileExtension = null;
+
+            if (createFile != null)
+            {
+                fileExtension = Path.GetExtension(createFile.Name);
+
+                long maxSize = MAX_WEIGHT_FILE_IN_MB * 1024 * 1024;
+
+                if (!fileExtension.ToLower().Equals(".csv"))
+                {
+                    ToastService.Notify(new ToastMessage()
+                        {
+                            Type = ToastType.Danger,
+                            Message = "El archivo debe ser de tipo CSV.",
+                            Title = "Error"
+                        });
+
+                    return;
+                }
+
+                if (createFile.Size == 0 || createFile.Size > maxSize)
+                {
+                    ToastService.Notify(new ToastMessage()
+                        {
+                            Type = ToastType.Danger,
+                            Message = "El archivo excede el tamaño máximo permitido de 5 MB.",
+                            Title = "Error"
+                        });
+
+                    return;
+                }
+            }
+            else
+            {
+                ToastService.Notify(new ToastMessage()
+                    {
+                        Type = ToastType.Danger,
+                        Message = "Debe adjuntar un archivo.",
+                        Title = "Error"
+                    });
+
+                return;
+            }
+
+            using var stream = createFile.OpenReadStream();
+            using var reader = new StreamReader(stream);
+
+            var importedRecords = new List<TimeRecordCsv>();
+            var taskProgressList = new List<TaskProgressRequest>();
+            var errorList = new List<string>();
+
+            string? line;
+            var firstLine = true;
+
+            while ((line = await reader.ReadLineAsync()) != null)
+            {
+                if (firstLine)
+                {
+                    firstLine = false;
+                    continue;
+                }
+
+                try
+                {
+                    var values = line.Split(';');
+
+                    if (string.IsNullOrEmpty(values[0]) && string.IsNullOrEmpty(values[1]))
+                    {
+                        break;
+                    }
+
+                    var record = new TimeRecordCsv()
+                        {
+                            Proyecto = values[0],
+                            Fecha = DateTime.Parse(values[1]),
+                            Usuario = values[2],
+                            Actividad = values[3],
+                            RM = values[4],
+                            Peticion = values[5],
+                            Comentario = values[6],
+                            Horas = decimal.Parse(values[7])
+                        };
+
+                    importedRecords.Add(record);
+                }
+                catch (Exception ex)
+                {
+                    ToastService.Notify(new ToastMessage()
+                        {
+                            Type = ToastType.Danger,
+                            Message = "Error inesperado al realizar la acción",
+                            Title = "Error"
+                        });
+                }
+            }
+
+
+            var client = _clients.First(x => x.Id == _clientId);
+            var project = _projects.First(x => x.Id == _projectId);
+
+            var tasks = await _projectTaskService.GetAsync();
+            var taskTypes = await _taskTypeService.GetAsync();
+            var users = await _userService.GetAsync();
+
+            foreach (var i in importedRecords)
+            {
+                var task = tasks.FirstOrDefault(x => x.KanbanId != null && x.KanbanId.Equals(i.RM));
+                var taskType = taskTypes.FirstOrDefault(x => x.Name.Equals(i.Actividad));
+                var user = users.FirstOrDefault(x => i.Usuario.Contains(x.Firstname) && i.Usuario.Contains(x.Lastname));
+
+                if (task == null)
+                {
+                    await _projectTaskService.AddAsync(new ProjectTask()
+                        {
+                            ProjectId = project.Id,
+                            Name = $"{i.RM} {i.Peticion}",
+                            KanbanId = i.RM,
+                            Description = $"{i.Peticion}",
+                            CreationDate = importedRecords.OrderByDescending(x => x.Fecha).First().Fecha,
+                        });
+
+                    tasks = await _projectTaskService.GetAsync();
+                    task = tasks.First(x => x.KanbanId != null && x.KanbanId.Equals(i.RM));
+                }
+
+                if (taskType == null)
+                {
+                    await _taskTypeService.AddAsync(new TaskType()
+                        {
+                            Name = i.Actividad
+                        });
+
+                    taskTypes = await _taskTypeService.GetAsync();
+                    taskType = taskTypes.FirstOrDefault(x => x.Name.Equals(i.Actividad));
+                }
+
+                if (user == null)
+                {
+                    ToastService.Notify(new ToastMessage()
+                        {
+                            Type = ToastType.Danger,
+                            Message = $"Usuario {i.Usuario} no existente en DB.",
+                            Title = "Error"
+                        });
+
+                    errorList.Add($"Usuario {i.Usuario} no existente en DB.");
+                    continue;
+                }
+
+                taskProgressList.Add(new TaskProgressRequest()
+                    {
+                        TaskId = task.Id,
+                        Hours = i.Horas,
+                        Date = i.Fecha,
+                        UserId = user.Id,
+                        TaskTypeId = taskType.Id,
+                        Comment = i.Comentario
+                    });
+
+            }
+
+            if (taskProgressList.Count == 0)
+            {
+                ToastService.Notify(new ToastMessage()
+                    {
+                        Type = ToastType.Danger,
+                        Message = "No se encontraron registros válidos en el archivo.",
+                        Title = "Error"
+                    });
+
+                return;
+            }
+
+            await _taskProgressService.AddAsync(taskProgressList);
+
+            CancelAdd();
+            await GetGrid();
+            await grid.RefreshDataAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private void CancelAdd()
+    {
+        createFile = null!;
+    }
+
+    private void ChangeDatePlus() => filterDate = filterDate.AddMonths(1);
+    private void ChangeDateLess() => filterDate = filterDate.AddMonths(-1);
+
+    private void ShowError(string title, string message)
+    {
+        ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = message,
+                Title = title
+            });
+    }
+
+    private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
+}

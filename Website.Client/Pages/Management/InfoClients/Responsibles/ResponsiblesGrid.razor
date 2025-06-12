@@ -1,0 +1,362 @@
+﻿@using BlazorBootstrap
+@using DataService.Interfaces.Management;
+@using DataService.State;
+@using DataContext;
+
+@inherits Responsibles
+
+@inject IClientService _service
+@inject IContractService _contractService
+@inject IResponsibleService _responsibleService
+
+@inject ChangedState changedState
+
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleContentAsync">
+            Asignar Responsables
+        </Button>
+    </div>
+</div>
+<Collapse @ref="collapseAgregar">
+    <Card>
+		<CardBody>
+			<div class="row">
+				<div class="col-4">
+					<label>Cliente</label>
+					<InputSelect class="form-select" @bind-Value="createClient.Id">
+						<option value="-1" disabled="@(createClient.Id != -1)">Seleccione</option>
+						@foreach (var p in _clients)
+						{
+							<option value="@p.Id">@p.Name</option>
+						}
+					</InputSelect>
+				</div>
+
+				<div class="col-4">
+					<label>Nombre del Responsable</label>
+					<InputText class="form-control" @bind-Value="@createResponsible.Name"></InputText>
+				</div>
+
+				<div class="col-4">
+					<label>Mail</label>
+					<InputText class="form-control" @bind-Value="@createResponsible.Mail" placeholder="Ingrese su mail"></InputText>
+				</div>
+			</div>
+
+
+			<div class="row mt-4">
+				<div class="col-12 d-flex justify-content-end">
+					<div class="row w-25">
+						<div class="col-6">
+							<Button class="btn btn-secondary form-control" onclick="@(() => CancelAdd())">
+								Limpiar
+							</Button>
+						</div>
+						<div class="col-6">
+							<Button class="btn btn-primary form-control" onclick="@(() => SaveAdd())">
+								Crear
+							</Button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</CardBody>
+
+    </Card>
+</Collapse>
+
+<br />
+<br />
+
+<Grid TItem="ClientResponsible" @ref="grid"
+      Class="table table-hover table-bordered table-striped"
+      Data="_responsibles"
+      AllowSorting="true"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="10"
+      Responsive="true">
+
+    <GridColumn TItem="ClientResponsible" HeaderText="Cliente" SortKeySelector="item => item.Client.Name" PropertyName="ClientName" FilterOperator="FilterOperator.Contains">
+        @context.Client.Name
+    </GridColumn>
+
+    <GridColumn TItem="ClientResponsible" HeaderText="Nombre" SortKeySelector="item => item.Name" PropertyName="Name" FilterOperator="FilterOperator.Contains">
+        @context.Name
+    </GridColumn>
+
+    <GridColumn TItem="ClientResponsible" HeaderText="Mail" SortKeySelector="item => item.Mail" PropertyName="Mail" FilterOperator="FilterOperator.Contains">
+        @context.Mail
+    </GridColumn>
+
+    <GridColumn TItem="ClientResponsible" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="row">
+            <div class="col-12 d-flex">
+                <Button @onclick="async () => await OnShowModalClick(context)">
+                    <span class="oi oi-pencil" aria-hidden="true" title="Editar"></span>
+                </Button>
+
+                <Button @onclick="async () => await SaveDefinitiveDelete(context.Id)">
+                    <span class="oi oi-circle-x" aria-hidden="true" title="Eliminar" style="color: var(--l-red)"></span>
+                </Button>
+            </div>
+        </div>
+    </GridColumn>
+</Grid>
+
+<Modal @ref="modal" Title="Editar Responsable" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h4><b>@editResponsible.Name / @editResponsible.Client.Name </b></h4>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-8">
+                Cliente
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-3">
+                <InputSelect class="form-select" @bind-Value="editResponsible.ClientId">
+                    <option value="-1" disabled="@(editResponsible.ClientId!= -1)">Seleccione</option>
+                    @foreach (var p in _clients)
+                    {
+                        <option value="@p.Id">@p.Name</option>
+                    }
+                </InputSelect>
+            </div>
+        </div>
+
+        <div class="row" style="margin-top: 25px">
+            <div class="col-6">
+                Nombre
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-6">
+                <InputText Class="form-control" @bind-Value="@editResponsible.Name"></InputText>
+            </div>
+        </div>
+
+        <div class="row" style="margin-top: 25px">
+            <div class="col-6">
+                Mail
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-6">
+                <InputText Class="form-control" @bind-Value="@editResponsible.Mail"></InputText>               
+            </div>
+        </div>
+
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Cerrar</Button>
+        </div>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="SaveEdit">Guardar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+@code {
+    [Inject] ToastService ToastService { get; set; }
+    private Collapse collapseAgregar;
+    private Grid<ClientResponsible> grid;
+
+    private Modal modal;
+    private long modalId { get; set; }
+    private string modalName { get; set; } = "";
+
+    private Client editClient { get; set; } = new Client ();
+    private Client createClient { get; set; } = new Client ();
+
+    private ClientResponsible editResponsible { get; set; } = new ClientResponsible();
+    private ClientResponsible createResponsible { get; set; } = new ClientResponsible();
+
+    private List<Client> _clients = new List<Client>();
+    private List<ClientResponsible> _responsibles = new List<ClientResponsible>();
+
+	protected override async Task OnInitializedAsync()
+	{
+		changedState.ChangeAction += StateHasChanged;
+
+		await GetGrid();
+		await GetCombos();
+		await base.OnInitializedAsync();
+	}
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		await GetCombos();
+	}
+
+	public void Dispose()
+	{
+		changedState.ChangeAction -= StateHasChanged;
+	}
+
+	private async Task GetCombos()
+	{
+		try
+		{
+			_clients = await _service.GetAsync();
+		}
+		catch (Exception ex)
+		{
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Danger,
+					Message = "Error inesperado al realizar la acción",
+					Title = "Error"
+				});
+		}
+	}
+
+	private async Task GetGrid()
+	{
+		try
+		{			
+			_responsibles = await _responsibleService.GetAsync();
+		}
+		catch (Exception ex)
+		{
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Danger,
+					Message = "Error inesperado al realizar la acción",
+					Title = "Error"
+				});
+		}
+	}
+
+	private async Task SaveAdd()
+	{
+
+		createResponsible.ClientId = createClient.Id;
+
+		try
+		{
+			await _responsibleService.AddAsync(createResponsible);
+
+			createResponsible = new ClientResponsible();
+
+			await GetGrid();
+			await grid.RefreshDataAsync();
+
+			changedState.InitChanges();
+
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Success,
+					Message = "Contrato guardado con exito.",
+					Title = "Contrato Guardado"
+				});
+
+			CancelAdd();
+		}
+		catch (Exception ex)
+		{
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Danger,
+					Message = "Error inesperado al realizar la acción",
+					Title = "Error"
+				});
+		}
+	}
+
+	private void CancelAdd()
+	{
+		createClient.Id = default;
+		createResponsible.Name = "";
+		createResponsible.Mail = "";
+	}
+
+	private async Task SaveEdit()
+	{
+		try
+		{
+			await _responsibleService.EditAsync(editResponsible);
+
+			await GetGrid();
+			await grid.RefreshDataAsync();
+			await OnHideModalClick();
+
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Success,
+					Message = "Responsable editado con exito.",
+					Title = "Responsable Editado"
+				});
+		}
+		catch (Exception ex)
+		{
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Danger,
+					Message = "Error inesperado al realizar la acción",
+					Title = "Error"
+				});
+		}
+
+	}
+
+	private async Task SaveDefinitiveDelete(long Id)
+	{
+		try
+		{
+			await _responsibleService.DefinitiveDeleteAsync(Id);
+
+			await GetGrid();
+			await grid.RefreshDataAsync();
+			await OnHideModalClick();
+
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Success,
+					Message = "Responsable eliminado con exito.",
+					Title = "Responsable Eliminado"
+				});
+		}
+		catch (Exception ex)
+		{
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Danger,
+					Message = "Error inesperado al realizar la acción",
+					Title = "Error"
+				});
+		}
+	}
+
+	private async Task OnShowModalClick(ClientResponsible clientResponsible)
+	{
+		editResponsible = clientResponsible;
+
+		await modal?.ShowAsync();
+	}
+
+	private async Task OnHideModalClick()
+	{
+
+		editResponsible.ClientId = -1;
+
+		await modal?.HideAsync();
+	}
+
+	private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
+
+	protected override void OnInitialized()
+	{
+		createClient.Id = -1;
+		editResponsible.ClientId = -1;
+		base.OnInitialized();
+	}
+}

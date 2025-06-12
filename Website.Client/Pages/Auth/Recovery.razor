@@ -1,0 +1,87 @@
+﻿@page "/recovery"
+@using BlazorBootstrap
+@using DataService.Interfaces.Management;
+
+@inject IConfiguration Configuration
+@inject NavigationManager Navigation
+@inject IUserService userService
+
+<br />
+
+<EditForm Model="@loginModel" OnValidSubmit="@SendRequest">
+    <div class="row d-flex justify-content-center">
+        <div class="col-3">
+            <Card>
+                <CardBody>
+                    <br />
+                    <div class="row">
+                        <div class="col-12 d-flex justify-content-center">
+                            <h5>Recuperar Contraseña</h5>
+                        </div>
+                    </div>
+                    <br />
+                    <br />
+                    <div class="row">
+                        <div class="col-1"></div>
+                        <div class="col-10">
+                            <InputText placeholder="Usuario" Class="form-control" @bind-Value="loginModel.Username"></InputText>
+                        </div>
+                    </div>
+                    <br />
+                    <br />
+                    <div class="row">
+                        <div class="col-1"></div>
+                        <div class="col-5">
+                            <Button Class="btn btn-secondary form-control" @onclick="() => NavigateToIndex()">
+                                Cancelar
+                            </Button>
+                        </div>
+                        <div class="col-5">
+                            <Button Class="btn btn-primary form-control" Type="ButtonType.Submit">
+                                Enviar
+                            </Button>
+                        </div>
+                    </div>
+                    <br />
+                </CardBody>
+            </Card>
+        </div>
+    </div>
+</EditForm>
+
+@code {
+    private class LoginModel
+    {
+        public string Username { get; set; } = "";
+    }
+
+    private LoginModel loginModel = new LoginModel();
+
+    private string Token { get; set; }
+
+    [Inject] ToastService ToastService { get; set; }
+
+    protected override void OnInitialized()
+    {
+        Token = Configuration["Tokens:RecoveryToken"];
+    }
+
+    private void NavigateToIndex() => Navigation.NavigateTo("/");
+
+    private async void SendRequest()
+    {
+        var result = await userService.ResetPassword(loginModel.Username);
+
+        if (result) Navigation.NavigateTo($"/newpassword/{loginModel.Username}/{Token}");
+
+        else
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Usuario no existente.",
+                    Title = "Error de Usuario"
+                });
+        }
+    }
+}

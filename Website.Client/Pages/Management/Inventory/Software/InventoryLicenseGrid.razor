@@ -1,0 +1,503 @@
+﻿@using BlazorBootstrap;
+@using DataContext;
+@using DataModel.Enums;
+@using DataService.Auth;
+@using DataService.Interfaces.Management;
+@using DataService.State;
+@using System.Globalization;
+@using System.Text.RegularExpressions;
+
+@inherits InventoryLicense
+
+@inject IJSRuntime JSRuntime
+@inject IAddModelService _AddModelService
+@inject IAddBrandService _AddBrandService
+
+@inject IInventoryLicenseService _inventoryLicenseService
+@inject IAddLicenseTypeService _inventoryLicenseTypeService
+@inject IUserService _userService
+
+@inject AuthService _authService
+
+@inject NavigationManager uriHelper;
+
+@inject ChangedState changedState
+
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleContentAsync">Crear Licencia</Button>
+    </div>
+</div>
+
+<Collapse @ref="collapseAgregar" Class="custom-container">
+    <Card>
+        <CardBody>
+            <div class="row">
+                <div class="col-4">
+                    Usuario
+                </div>
+                <div class="col-4">
+                    Tipo de Licencia
+                </div>
+                <div class="col-4">
+                    Nombre de Licencia
+                </div>
+            </div>
+            
+            <div class="row mt-2">
+                <div class="col-4">
+                    <InputSelect id="userSelect" class="form-select" @bind-Value="addInventoryLicense.UserId">
+                        <option value="-1" disabled="@(addInventoryLicense.UserId != -1)">Seleccione</option>
+                        @foreach (var p in _users.Where(u => u.IsActive).OrderBy(u => u.UserFullName))
+                        {
+                            <option value="@p.Id">@p.UserFullName</option>
+                        }
+                    </InputSelect>
+                </div>
+
+                <div class="col-4">
+                    <InputSelect class="form-select" @bind-Value="addInventoryLicenseType.Id">
+                        <option value="-1" disabled="@(addInventoryLicenseType.Id != -1)">Seleccione</option>
+                        @foreach (var p in _inventoryLicenseTypes)
+                        {
+                            <option value="@p.Id">@p.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-4">
+                    <InputText class="form-control" @bind-Value="addInventoryLicense.Name"></InputText>
+                </div>
+
+            </div>
+            <div class="row mt-2">
+                <div class="col-4">
+                    Descripcion
+                </div>
+                <div class="col-4">
+                    Serial
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-4">
+                    <InputText class="form-control" @bind-Value="addInventoryLicense.Description"></InputText>
+                </div>
+                <div class="col-4">
+                    <InputText class="form-control" @bind-Value="addInventoryLicense.Serial"></InputText>
+                </div>
+            </div>
+
+            <div class="row mt-2">
+                <div class="col-8"></div>
+                <div class="col-2">
+                    <Button class="btn form-control" Color="ButtonColor.Secondary" onclick="@(() => CancelAdd())">
+                        Limpiar
+                    </Button>
+                </div>
+                <div class="col-2">
+                    <Button class="btn form-control" Color="ButtonColor.Primary" onclick="@(() => SaveAdd())">
+                        Crear
+                    </Button>
+                </div>
+            </div>
+        </CardBody>
+    </Card>
+</Collapse>
+
+<br />
+
+
+<Grid TItem="DataContext.InventoryLicense" @ref="grid"
+      Data="_inventoryLicenses"
+      Class="table table-hover table-bordered table-striped text-nowrap"
+      AllowSorting="true"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="8"
+      Responsive="true"
+      Unit="Unit.Px">
+
+    <GridColumn TItem="DataContext.InventoryLicense" HeaderText="Usuario" SortKeySelector="item => item.User.UserFullName" PropertyName="Name" FilterOperator=" FilterOperator.Contains">
+        @context.User.UserFullName
+    </GridColumn>
+
+    <GridColumn TItem="DataContext.InventoryLicense" HeaderText="Licencias" SortKeySelector="item => item.Name" PropertyName="Name" FilterOperator=" FilterOperator.Contains">
+        @context.Name
+    </GridColumn>
+
+    <GridColumn TItem="DataContext.InventoryLicense" HeaderText="Tipo de Licencia" FilterOperator="FilterOperator.Contains">
+        @context.LicenseType.Name
+    </GridColumn>
+
+    <GridColumn TItem="DataContext.InventoryLicense" HeaderText="Activo" PropertyName="Active">
+        @if (context.Active.HasValue && context.Active.Value)
+        {
+            <span class="oi oi-circle-check" aria-hidden="true" style="color: var(--l-green)"></span>
+        }
+        else
+        {
+            <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-red)"></span>
+        }
+    </GridColumn>
+
+    <GridColumn TItem="DataContext.InventoryLicense" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="row">
+            <div class="col-12 d-flex">
+
+                <Button @onclick="async () => await OnShowModalEditClick(context)">
+                    <span class="oi oi-pencil" aria-hidden="true" title="Editar"></span>
+                </Button>
+
+                <Button @onclick="async () => await ToggleActiveAsync(context)">
+                    @if (context != null && context.Active.HasValue)
+                    {
+                        if (context.Active.Value)
+                        {
+                            <span class="oi oi-circle-x icon-active" aria-hidden="true" title="Inhabilitar"></span>
+                        }
+                        else
+                        {
+                            <span class="oi oi-circle-check icon-inactive" aria-hidden="true" title="Habilitar"></span>
+                        }
+                    }
+                </Button>
+
+                <Button @onclick="async () => await SaveDefinitiveDelete(context.Id)">
+                    <span class="oi oi-trash" aria-hidden="true" title="Eliminar"></span>
+                </Button>
+            </div>
+        </div>
+    </GridColumn>
+</Grid>
+
+<ConfirmDialog @ref="dialog" />
+
+<Modal @ref="modalEdit" Title="Editar Laptop" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h4>@editInventoryLicense.User.UserFullName</h4>
+                <div style="display: none">
+                    @editInventoryLicense.Id
+                </div>
+            </div>
+        </div>
+
+        <div class="row pt-2">
+            <div class="col-4 d-flex align-items-center">
+                Nombre de la Licencia
+            </div>
+            <div class="col-8">
+                <InputText Class="form-control" @bind-Value="@editInventoryLicense.Name"></InputText>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-4 d-flex align-items-center">
+                Tipo de Licencia
+            </div>
+            <div class="col-8">
+                <InputSelect class="form-select" @bind-Value="editInventoryLicense.LicenseTypeId">
+                    @foreach (var p in _inventoryLicenseTypes)
+                    {
+                        <option value="@p.Id">@p.Name</option>
+                    }
+                </InputSelect>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-4 d-flex align-items-center">
+                Descripcion
+            </div>
+            <div class="col-8">
+                <textarea class="form-control" rows="3" @bind="@editInventoryLicense.Description"></textarea>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-4 d-flex align-items-center">
+                Serial
+            </div>
+            <div class="col-8">
+                <InputText Class="form-control" @bind-Value="@editInventoryLicense.Serial"></InputText>
+            </div>
+        </div>
+
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalEditClick">Cerrar</Button>
+        </div>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="SaveEdit">Guardar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+@code
+{
+    [Inject] ToastService ToastService { get; set; }
+    private ConfirmDialog dialog;
+    private Collapse collapseAgregar;
+    private Grid<DataContext.InventoryLicense> grid;
+    private Modal modalEdit;
+
+    private DataContext.InventoryLicenseType addInventoryLicenseType { get; set; } = new DataContext.InventoryLicenseType();
+    private DataContext.InventoryLicenseType editInventoryLicenseType { get; set; } = new DataContext.InventoryLicenseType();
+
+    private DataContext.InventoryLicense addInventoryLicense { get; set; } = new DataContext.InventoryLicense();
+    private DataContext.InventoryLicense editInventoryLicense { get; set; } = new DataContext.InventoryLicense();
+
+    private List<DataContext.InventoryLicense> _inventoryLicenses = new List<DataContext.InventoryLicense>();
+    private List<DataContext.InventoryLicenseType> _inventoryLicenseTypes = new List<DataContext.InventoryLicenseType>();
+    private List<DataContext.User> _users = new List<DataContext.User>();
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await GetGrid();
+        await GetCombos();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        changedState.ChangeAction += StateHasChanged;
+        await GetGrid();
+        await GetCombos();
+        await base.OnInitializedAsync();
+    }
+
+    public void Dispose()
+    {
+        changedState.ChangeAction -= StateHasChanged;
+    }
+
+    private async Task GetCombos()
+    {
+        try
+        {
+            _users = (await _userService.GetAsync()).Where(x => x.IsActive).ToList();
+            _inventoryLicenseTypes = (await _inventoryLicenseTypeService.GetInventoryLicenseTypes()).ToList();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task GetGrid()
+    {
+        try
+        {
+            _inventoryLicenses = (await _inventoryLicenseService.GetAsync()).OrderBy(x => x.Id).ToList();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveAdd()
+    {
+        try
+        {
+            addInventoryLicense.LicenseTypeId = addInventoryLicenseType.Id;
+            addInventoryLicense.Active = true;
+
+            await _inventoryLicenseService.AddAsync(addInventoryLicense);
+
+            CancelAdd();
+
+            StateHasChanged();
+            changedState.InitChanges();
+            await GetGrid();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con exito",
+                    Title = "Agregar Licencia"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task DeleteActive(long id)
+    {
+        try
+        {
+
+            await _inventoryLicenseService.DeleteAsync(id);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Eliminar Licencia"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error al borrar Licencia",
+                    Title = "Error"
+                });
+        }
+
+    }
+
+    private void CancelAdd()
+    {
+        addInventoryLicense = new DataContext.InventoryLicense();
+        addInventoryLicense.LicenseTypeId = -1;
+        addInventoryLicenseType.Id = -1;
+        addInventoryLicense.UserId = -1;
+        
+    }
+
+    private async Task OnShowModalEditClick(DataContext.InventoryLicense inventoryLicense)
+    {
+        editInventoryLicense = inventoryLicense;
+        await modalEdit?.ShowAsync();
+    }
+
+    private async Task OnHideModalEditClick()
+    {
+
+        await modalEdit?.HideAsync();
+    }
+
+    private async Task SaveEdit()
+    {
+        try
+        {
+            await _inventoryLicenseService.EditAsync(editInventoryLicense);
+
+            StateHasChanged();
+
+            await grid.RefreshDataAsync();
+            await GetGrid();
+            await OnHideModalEditClick();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con exito",
+                    Title = "Editar Licencia"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
+
+    private async Task SaveDefinitiveDelete(long Id)
+    {
+        try
+        {
+            await _inventoryLicenseService.DefinitiveDeleteAsync(Id);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Eliminar Licencia"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error al borrar Licencia",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task ToggleActiveAsync(DataContext.InventoryLicense inventoryLicense)
+    {
+        if (inventoryLicense == null) return;
+
+        inventoryLicense.Active = !(inventoryLicense.Active.HasValue && inventoryLicense.Active.Value);
+
+        try
+        {
+            await _inventoryLicenseService.EditAsync(inventoryLicense);
+
+            var action = inventoryLicense.Active.Value ? "Activa" : "Inactiva";
+            ToastService.Notify(new ToastMessage
+                {
+                    Type = ToastType.Success,
+                    Message = $"La Licencia se encuentra {action}.",
+                    Title = "Licencia Actualizada"
+                });
+
+            await UpdateInventoryPart();
+            await grid.RefreshDataAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task UpdateInventoryPart()
+    {
+        _inventoryLicenses = await _inventoryLicenseService.GetAsync();
+    }
+
+
+    protected override void OnInitialized()
+    {
+
+        addInventoryLicenseType.Id = -1;
+        addInventoryLicense.UserId = -1;
+
+        addInventoryLicense.LicenseTypeId = addInventoryLicenseType.Id;
+       
+
+        base.OnInitialized();
+    }
+
+}

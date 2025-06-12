@@ -1,0 +1,1023 @@
+﻿@using BlazorBootstrap
+@using DataContext
+@using DataModel.Enums
+@using DataService.Auth;
+@using DataService.Interfaces.Management;
+@using DataService.Interfaces.ProjectManagement
+@using DataService.State;
+
+@inherits Period
+
+@inject IFeedBackUserService _feedBackUserService
+@inject IFeedBackPeriodService _feedBackPeriodService
+@inject IFeedBackItemService _feedBackItemService
+@inject IFeedBackCommentService _feedBackCommentService
+@inject IFeedBackStandarTypeService _feedBackStandarTypeService
+@inject IFeedBackImprovementService _feedBackImprovementService
+@inject IFeedBackImprovementUserService _feedBackImprovementUserService
+@inject IFeedBackStandarService _feedBackStandarService
+
+@inject IJSRuntime JSRuntime
+@inject IUserService _userService
+@inject AuthService authService
+
+@inject ChangedState changedState
+
+@if (authService.User.ProfileId != (long)ProfileTypes.Estandar)
+{
+    <br />
+
+    <div class="row">
+        <div class="col-12">
+            <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleContentAsync">
+                Crear Feedback de Recurso
+            </Button>
+        </div>
+    </div>
+
+    <Collapse @ref="collapseAddFeedBackUser">
+        <Card>
+            <CardBody>
+                <div class="row">
+                    <div class="col-3">
+                        <span class="text-nowrap">Usuario</span>
+                    </div>
+                    <div class="col-3">
+                        <span class="text-nowrap">Periodo</span>
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-3">
+                        <InputSelect id="userSelect" class="form-select" @bind-Value="createFeedbackuser.UserId">
+                            <option value="-1" disabled="@(createFeedbackuser.UserId != -1)">Seleccione</option>
+                            @foreach (var p in _users.Where(u => u.IsActive).OrderBy(u => u.UserFullName))
+                            {
+                                <option value="@p.Id">@p.UserFullName</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-3">
+                        <DateInput Class="form-control" @bind-Value="@createFeedbackuser.Period"></DateInput>
+                    </div>
+                    <div class="col-3 d-flex justify-content-center align-items-end">
+                        <Button Class="btn btn-secondary form-control" onclick="@(() => CancelAdd())">
+                            Limpiar
+                        </Button>
+                    </div>
+                    <div class="col-3 d-flex justify-content-center align-items-end">
+                        <Button Class="btn btn-primary form-control" onclick="@(() => SaveAdd())">
+                            Crear
+                        </Button>
+                    </div>
+                </div>
+            </CardBody>
+        </Card>
+    </Collapse>
+}
+
+<br />
+<br />
+
+<Grid TItem="FeedbackUser" @ref="grid"
+Data="_feedBackUsers"
+Class="table table-hover table-bordered table-striped"
+AllowSorting="true"
+AllowFiltering="true"
+AllowPaging="true"
+PageSize="20"
+Responsive="true"
+AllowDetailView="true">
+
+    <GridColumns>
+        <GridColumn TItem="FeedbackUser" HeaderText="Nombre" SortKeySelector="item => item.User.UserFullName" PropertyName="UserFullName" FilterOperator="FilterOperator.Contains">
+            @context.User.UserFullName
+        </GridColumn>
+
+        <GridColumn TItem="FeedbackUser" HeaderText="Periodo" SortKeySelector="item => item.PeriodDateOnly" PropertyName="PeriodDateOnly" FilterOperator="FilterOperator.Equals">
+            @context.PeriodDateOnly.ToString("MM/yyyy")
+        </GridColumn>
+
+        <GridColumn TItem="FeedbackUser" HeaderText="Activo" PropertyName="Active" Filterable="false" Sortable="false" FilterOperator="FilterOperator.Equals">
+            @if (context.Active.HasValue && context.Active.Value)
+            {
+                <span class="oi oi-circle-check" aria-hidden="true" style="color: var(--l-green)"></span>
+            }
+            else
+            {
+                <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-red)"></span>
+            }
+        </GridColumn>
+
+        <GridColumn TItem="FeedbackUser" HeaderText="Acciones" Sortable="false" Filterable="false">
+            <div class="d-inline-flex">
+                @if (authService.User.ProfileId == (long)ProfileTypes.Administrador)
+                {                   
+                    <Button @onclick="async () => await OnShowModalPeriod(context)">
+                        <span class="oi oi-clipboard" aria-hidden="true" title="Calificar"></span>
+                    </Button>
+
+                    <Button @onclick="async () => await OnShowModalImprovement(context, context.Id)">
+                        <span class="oi oi-document" aria-hidden="true" title="Áreas De Mejora"></span>
+                    </Button>
+
+                    <Button @onclick="async () => await OnShowModalComment(context)">
+                        <span class="oi oi-comment-square" aria-hidden="true" title="Comentarios"></span>
+                    </Button>
+
+                    <Button @onclick="async () => await ToggleActiveAsync(context)">
+                        @if (context != null && context.Active.HasValue)
+                        {
+                            @if (context.Active.Value)
+                            {
+                                <span class="oi oi-circle-x" style="color: var(--l-red)" aria-hidden="true" title="Inhabilitar"></span>
+                            }
+                            else
+                            {
+                                <span class="oi oi-circle-check" style="color: var(--l-green)" aria-hidden="true" title="Habilitar"></span>
+                            }
+                        }
+                    </Button>
+
+                    <Button @onclick="async () => await SaveDefinitiveDeleteUser(context.Id)">
+                        <span class="oi oi-trash" aria-hidden="true" title="Eliminar"></span>
+                    </Button>
+                }
+                else if (authService.User.ProfileId != (long)ProfileTypes.Estandar && context.User.UserFullName != authService.User.UserFullName)
+                {                  
+                    <Button @onclick="async () => await OnShowModalPeriod(context)">
+                        <span class="oi oi-clipboard" aria-hidden="true" title="Calificar"></span>
+                    </Button>
+
+                    <Button @onclick="async () => await OnShowModalImprovement(context, context.Id)">
+                        <span class="oi oi-document" aria-hidden="true" title="Áreas De Mejora"></span>
+                    </Button>
+
+                    <Button @onclick="async () => await ToggleActiveAsync(context)">
+                        @if (context != null && context.Active.HasValue)
+                        {
+                            @if (context.Active.Value)
+                            {
+                                <span class="oi oi-circle-x" style="color: var(--l-red)" aria-hidden="true" title="Inhabilitar"></span>
+                            }
+                            else
+                            {
+                                <span class="oi oi-circle-check" style="color: var(--l-green)" aria-hidden="true" title="Habilitar"></span>
+                            }
+                        }
+                    </Button>
+
+                    <Button @onclick="async () => await SaveDefinitiveDeleteUser(context.Id)">
+                        <span class="oi oi-trash" aria-hidden="true" title="Eliminar"></span>
+                    </Button>
+                }
+                else
+                {
+                    <Button @onclick="async () => await OnShowModalComment(context)">
+                        <span class="oi oi-comment-square" aria-hidden="true" title="Comentarios"></span>
+                    </Button>
+                }
+            </div>
+        </GridColumn>
+    </GridColumns>
+
+    <GridDetailView TItem="FeedbackUser">
+        <div class="row">
+            <div class="col-12">
+                @{
+                    var groupedFeedbackItems = _feedBackItems
+                    .GroupBy(item => item.FeedbackStandar.Name)
+                    .ToList();
+
+                    foreach (var group in groupedFeedbackItems)
+                    {
+                        <div class="row">
+                            <div class="col-8" style="margin-bottom: 10px">
+                                <span><b>@group.Key</b></span>
+                            </div>
+                            <div class="col-2">
+                                <span class="oi oi-question-mark" aria-hidden="true" title="@(group.ToList().Count > 0 ? group.ToList()[0].FeedbackStandar.Description : "")"></span>
+                            </div>
+                        </div>
+
+                        foreach (var item in group)
+                        {
+                            var feedbackPeriod = context.FeedbackPeriods.FirstOrDefault(x => x.FeedbackItemId == item.Id);
+
+                            <div class="row">
+                                <div class="col-6">
+                                    <span>@item.Name</span>
+                                </div>
+                                <div class="col-2">
+                                    <span>@(feedbackPeriod == null || feedbackPeriod.FeedbackStandarType == null ? "N/A" : feedbackPeriod.FeedbackStandarType.Name)</span>
+                                </div>
+                                <div class="col-2">
+                                    <span class="oi oi-info" aria-hidden="true" title="@(feedbackPeriod == null || feedbackPeriod.FeedbackStandarType == null ? "N/A" : feedbackPeriod.FeedbackStandarType.Description)"></span>
+                                </div>
+                            </div>
+                        }
+
+                        <div class="row">
+                            <div class="col-12">
+                                <hr />
+                            </div>
+                        </div>
+                    }
+
+                    if (context.FeedbackImprovementUsers.Count > 0)
+                    {
+                        <div class="row">
+                            <div class="col-12" style="margin-top: 20px; margin-bottom: 10px">
+                                <h5>Áreas de Mejora</h5>
+                            </div>
+                        </div>
+
+                        @foreach (var i in context.FeedbackImprovementUsers)
+                        {
+                            <div class="row">
+                                <div class="col-8">
+                                    <span><b>@i.FeedbackImprovement.Name</b></span>
+                                </div>
+                                <div class="col-2">
+                                    <span class="oi oi-question-mark" aria-hidden="true" title="@i.FeedbackImprovement.Description"></span>
+                                </div>
+                            </div>
+                            <div class="row" style="margin-bottom: 10px">
+                                <div class="col-12">
+                                    <span>@i.Description</span>
+                                </div>
+                            </div>
+                        }
+                    }
+
+                }
+            </div>
+        </div>
+    </GridDetailView>
+</Grid>
+
+
+<Modal @ref="modalPeriod" Title="Calificar Periodo" Size="ModalSize.ExtraLarge">
+    <BodyTemplate>
+        <div class="container">
+
+            <div class="row">
+                <div class="col-12">
+                    <h6 style="text-align: center;"><b>Feedback de @editFeedbackuser.User.Firstname @editFeedbackuser.User.Lastname</b></h6>
+                    <div style="display: none">
+                        @editFeedbackuser.Id
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-12">
+                    <Grid TItem="FeedbackPeriod" @ref="gridPeriod"
+                    Data="editFeedbackuser.FeedbackPeriods"
+                    Class="table table-hover table-bordered table-striped"
+                    Responsive="true">
+
+                        <GridColumn TItem="FeedbackPeriod" HeaderText="Categoría">
+                            @context.FeedbackItem?.FeedbackStandar?.Name
+                        </GridColumn>
+
+                        <GridColumn TItem="FeedbackPeriod" HeaderText="Evaluación">
+                            @context.FeedbackItem.Name
+                        </GridColumn>
+
+                        <GridColumn TItem="FeedbackPeriod" HeaderText="Valoración">
+                            <ChildContent>
+                                <InputSelect ValueExpression="@(() => context.FeedbackStandarTypeId)" Value="context.FeedbackStandarTypeId" ValueChanged="@(async (long? value) => await OnStandarTypeSelected(context, value))">
+                                    <option value="">Seleccione</option>
+                                    @foreach (var type in _feedBackStandarTypes.Where(t => t.FeedbackStandarId == context.FeedbackItem.FeedbackStandarId))
+                                    {
+                                        <option value="@type.Id">@type.Name</option>
+                                    }
+                                </InputSelect>
+                            </ChildContent>
+                        </GridColumn>
+
+                        <GridColumn TItem="FeedbackPeriod" HeaderText="Criterio">
+                            @if (context.FeedbackStandarType != null)
+                            {
+                                @context.FeedbackStandarType.Description
+                            }
+                            else
+                            {
+                                <span>N/A</span>
+                            }
+                        </GridColumn>
+                    </Grid>
+                </div>
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="row col-12">
+            <div class="col-9">
+            </div>
+            <div class="col-3">
+                <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalPeriod">Cerrar</Button>
+            </div>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+<Modal @ref="modalImprovement" Title="Área de Mejora" Size="ModalSize.ExtraLarge">  <!-- ACA No Actualiza -->
+    <BodyTemplate>
+        <div class="container">
+            <div class="row">
+                <div class="col-12">
+                    <h6 style="text-align: center;"><b>Área de Mejora de @editFeedbackuser.User.Firstname @editFeedbackuser.User.Lastname</b></h6>
+                    <div style="display: none">
+                        @editFeedbackuser.Id
+                    </div>
+                </div>
+            </div>
+
+            <div class="row pt-3">
+                <div class="col-12">
+                    <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleCollapseTableAgregar">
+                        Crear Área de Mejora
+                    </Button>
+                </div>
+            </div>
+            <Collapse @ref=" collapseAddImprovementUser">
+                <Card Class="card">
+                    <CardBody>
+                        <div class="row mb-3">
+                            <div class="col-4">
+                                <span class="text-nowrap">Mejora</span>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-8">
+                                <InputSelect id="improvementSelect" class="form-select" @bind-Value="createFeedbackImprovement.Id">
+                                    <option value="-1" disabled selected="@(createFeedbackImprovement.Id == -1)">Seleccione</option>
+                                    @foreach (var p in _feedBackImprovements)
+                                    {
+                                        <option value="@p.Id">@p.Name</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-4">
+                                <span class="text-nowrap">Comentario</span>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-8">
+                                <textarea id="collaboratorTextarea" class="form-control" @bind="createFeedbackImprovementUsers.Description" rows="4"></textarea>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-12 col-md-2 d-flex justify-content-center align-items-end mt-2 mt-md-0">
+                                <Button Class="btn btn-secondary w-100" onclick="@(() => CancelAdd())">
+                                    Limpiar
+                                </Button>
+                            </div>
+                            <div class="col-12 col-md-2 d-flex justify-content-center align-items-end mt-2 mt-md-0">
+                                <Button Class="btn btn-primary w-100" onclick="@(() => SaveAddImprovementUser())">
+                                    Crear
+                                </Button>
+                            </div>
+                        </div>
+                    </CardBody>
+                </Card>
+            </Collapse>
+
+            <div class="row pt-3">
+                <div class="col-12">
+                    <Grid TItem="FeedbackImprovementUser" @ref="gridImprovementUser"
+                    Data="@editFeedbackuser.FeedbackImprovementUsers"
+                    Class="table table-hover table-bordered table-striped">
+
+                        <GridColumn TItem="FeedbackImprovementUser" HeaderText="Área de Mejora">
+                            @context.FeedbackImprovement.Name
+                        </GridColumn>
+                        <GridColumn TItem="FeedbackImprovementUser" HeaderText="Comentario">
+                            @context.Description
+                        </GridColumn>
+                        <GridColumn TItem="FeedbackImprovementUser" HeaderText="Acciones" Sortable="false" Filterable="false">
+                            <div class="row">
+                                <div class="col-12 d-flex">
+                                    <Button @onclick="async () => await OnShowModalClickImprovementUser(context)">
+                                        <span class="oi oi-pencil" aria-hidden="true" title="Editar"></span>
+                                    </Button>
+                                    <Button @onclick="async () => await SaveDefinitiveDeleteImprovementUsers(context.Id)">
+                                        <span class="oi oi-trash" aria-hidden="true" title="Eliminar"></span>
+                                    </Button>
+                                </div>
+                            </div>
+                        </GridColumn>
+                    </Grid>
+                </div>
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="row col-12">
+            <div class="col-9">
+            </div>
+            <div class="col-3">
+                <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalImprovenment">Cerrar</Button>
+            </div>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+<Modal @ref="modalImprovementUser" Title="Editar Comentario" Size="ModalSize.Large" Style="margin-top: 50px !important;">
+    <BodyTemplate>
+        <div style="display: none">
+            @editFeedbackImprovementUsers.Id
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <h5><b>@editFeedbackImprovementUsers.FeedbackImprovement.Name</b></h5>
+            </div>
+        </div>
+
+        <div class="row pt-3">
+            <div class="col-12">
+                <textarea class="form-control" @bind="editDescriptionTemp" rows="4"></textarea>
+            </div>
+        </div>
+
+    </BodyTemplate>
+
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalImprovementUser">Cerrar</Button>
+        </div>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="SaveEditImprovementUser">Guardar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+<Modal @ref="modalComments" Title="Comentarios" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h4 style="text-align: center;"><b>Chat de @editFeedbackuser.User.Firstname @editFeedbackuser.User.Lastname</b></h4>
+            </div>
+        </div>
+
+        <div class="row pt-3">
+            <div class="col-12" style="overflow: auto; margin-bottom: 10px">
+                @foreach (var message in editFeedbackuser.FeedbackComments)
+                {
+                    <div class="row history-container">
+                        <div class="col-12">
+                            <div class="row" style="margin-top: 10px">
+                                <div class="col-12 d-flex align-items-center justify-content-end">
+
+                                </div>
+                            </div>
+                            <div class="row" style="margin-top: 10px">
+                                <div class="col-4 d-flex align-items-center">
+                                    <b>@message.User.Username</b>
+                                </div>
+                                <div class="col-8 d-flex align-items-center justify-content-end">
+                                    @message.Date.ToString("dd/MM/yyyy HH:mm")
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="row" style="margin-top: 10px; margin-bottom: 10px">
+                                <div class="col-10">
+                                    @message.Comment
+                                </div>
+                                <div class="col-2 d-flex align-items-center justify-content-end">
+
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-12">
+                <textarea class="form-control" style="border-radius:5px;" @bind="createFeedbackComments.Comment" rows="3"></textarea>
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalComment">Cerrar</Button>
+        </div>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="SaveAddComment">Enviar</Button>
+        </div>
+    </FooterTemplate>
+</Modal> 
+
+@code {
+    [Inject] private ToastService ToastService { get; set; }
+    [Inject] protected PreloadService PreloadService { get; set; }
+
+    private Dictionary<long, bool> periodButtonStates = new Dictionary<long, bool>();
+    private Dictionary<long, bool> improvementButtonStates = new Dictionary<long, bool>();
+
+    private long idFeedBackUser = 0;
+    private string editDescriptionTemp;
+
+    private Modal modal;
+    private Modal modalComments;
+    private Modal modalPeriod;
+    private Modal modalImprovement;
+    private Modal modalImprovementUser;
+
+    private Collapse collapseAddFeedBackUser;
+    private Collapse collapseAddImprovementUser;
+
+    private Grid<FeedbackUser> grid;
+    private Grid<FeedbackPeriod> gridPeriod;
+    private Grid<FeedbackImprovementUser> gridImprovementUser;
+
+    private FeedbackUser editFeedbackuser { get; set; } = new FeedbackUser();
+    private FeedbackUser createFeedbackuser { get; set; } = new FeedbackUser();
+
+    private FeedbackPeriod createFeedbackPeriod { get; set; } = new FeedbackPeriod();
+
+    private FeedbackImprovement editFeedbackImprovement { get; set; } = new FeedbackImprovement();
+    private FeedbackImprovement createFeedbackImprovement { get; set; } = new FeedbackImprovement();
+
+    private FeedbackImprovementUser editFeedbackImprovementUsers { get; set; } = new FeedbackImprovementUser();
+    private FeedbackImprovementUser createFeedbackImprovementUsers { get; set; } = new FeedbackImprovementUser();
+
+    private FeedbackComment createFeedbackComments { get; set; } = new FeedbackComment();
+
+    private List<FeedbackUser> _feedBackUsers = new List<FeedbackUser>();
+
+    private List<User> _users = new List<User>();
+    private List<FeedbackItem> _feedBackItems = new List<FeedbackItem>();
+    private List<FeedbackStandarType> _feedBackStandarTypes = new List<FeedbackStandarType>();
+    private List<FeedbackImprovement> _feedBackImprovements = new List<FeedbackImprovement>();
+    private List<FeedbackImprovementUser> _feedBackImprovementUsers = new List<FeedbackImprovementUser>();
+
+    private long currentUserId;
+    private FeedbackUser selectedFeedBackUser = new FeedbackUser();
+
+    protected override async Task OnInitializedAsync()
+    {
+        createFeedbackuser.UserId = -1;
+        editFeedbackImprovementUsers.Description = null;
+        createFeedbackImprovement.Id = -1;
+
+        if (createFeedbackuser.Period == default)
+        {
+            createFeedbackuser.Period = DateTime.Today;
+        }
+
+        changedState.ChangeAction += StateHasChanged;
+
+        try
+        {
+            PreloadService.Show();
+
+            await GetGrid();
+            await GetCombo();
+        }
+        catch (Exception e)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción.",
+                    Title = "Error"
+                });
+        }
+        finally
+        {
+            PreloadService.Hide();
+        }
+
+        await base.OnInitializedAsync();
+    }
+
+    public void Dispose()
+    {
+        changedState.ChangeAction -= StateHasChanged;
+    }
+
+    private async Task GetGrid()
+    {
+        _feedBackUsers = await _feedBackUserService.GetByUserIdAsync(authService.User.Id);
+        _feedBackImprovementUsers = (await _feedBackImprovementUserService.GetAsync()).Where(x => x.FeedbackUserId == currentUserId).ToList();
+
+        if (authService.User.ProfileId == (long)ProfileTypes.Estandar)
+        {
+            _feedBackUsers = _feedBackUsers.Where(x => x.Active.HasValue && x.Active.Value).ToList();
+        }
+    }
+
+    private async Task GetCombo()
+    {
+        if (authService.User.ProfileId == (long)ProfileTypes.Estandar)
+        {
+            _users = default!;
+        }
+        else if (authService.User.ProfileId == (long)ProfileTypes.GestorProyectos)
+        {
+            _users = await GetFilteredUsers(authService.User.Id);
+        }
+        else
+        {
+            _users = (await _userService.GetAsync()).Where(x => x.IsActive).ToList();
+        }
+
+        _feedBackItems = (await _feedBackItemService.GetAsync()).Where(x => x.Active == true).ToList();
+        _feedBackStandarTypes = (await _feedBackStandarTypeService.GetAsync()).Where(x => x.Active == true).ToList();
+        _feedBackImprovements = await _feedBackImprovementService.GetAsync();
+    }
+
+    private async Task<List<User>> GetFilteredUsers(long loggedInUserId) 
+    {
+        var allUsers = await _userService.GetAsync();
+
+        var directSubordinates = allUsers
+            .Where(x => x.Superior == loggedInUserId && x.IsActive && x.ProfileId != (long)ProfileTypes.GestorProyectos && x.ProfileId != (long)ProfileTypes.Administrador)
+            .ToList();
+
+        var loggedInUserTeams = allUsers
+            .FirstOrDefault(x => x.Id == loggedInUserId)?
+            .UserTeams
+            .Select(ut => ut.TeamId)
+            .Where(teamId => teamId != 2)
+            .ToList();
+
+        var teamMembers = allUsers
+            .Where(x => x.UserTeams.Any(ut => loggedInUserTeams.Contains(ut.TeamId)) && x.IsActive
+                        && x.ProfileId != (long)ProfileTypes.GestorProyectos && x.ProfileId != (long)ProfileTypes.Administrador)
+            .ToList();
+
+        return directSubordinates.Union(teamMembers).Distinct().ToList();
+    }
+
+
+    private async Task SaveAdd()
+    {
+        await SaveAddFeedBackUser();
+        await SaveAddPeriod();
+    }
+
+    private void CancelAdd()
+    {
+        createFeedbackuser.Period = DateTime.Now;
+        createFeedbackuser.User = null!;
+        createFeedbackComments.Comment = null!;
+        createFeedbackImprovementUsers = new FeedbackImprovementUser();
+        createFeedbackImprovement.Id = -1;
+    }
+
+    private async Task SaveAddFeedBackUser()
+    {
+        try
+        {
+            await _feedBackUserService.AddAsync(createFeedbackuser);
+
+            await GetGrid();
+
+            changedState.InitChanges();
+
+            CancelAdd();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con exito",
+                    Title = "Agregar FeedBackUser"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción: FB user",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveAddPeriod()
+    {
+        try
+        {
+            createFeedbackPeriod.FeedbackUserId = createFeedbackuser.Id;
+            var feedbackItemIds = _feedBackItems.Select(item => item.Id).ToList();
+
+            foreach (var feedbackItemId in feedbackItemIds)
+            {
+                var newFeedbackPeriod = new FeedbackPeriod
+                    {
+                        FeedbackUserId = createFeedbackPeriod.FeedbackUserId,
+                        FeedbackStandarTypeId = null,
+                        FeedbackItemId = feedbackItemId
+                    };
+
+                await _feedBackPeriodService.AddAsync(newFeedbackPeriod);
+            }
+
+            createFeedbackPeriod = new FeedbackPeriod();
+            createFeedbackuser = new FeedbackUser();
+
+            await GetGrid();
+
+            changedState.InitChanges();
+            CancelAdd();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con éxito",
+                    Title = "Agregar FeedBackPeriod"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción: FB Period",
+                    Title = "ANDA MAL FB PERIOD"
+                });
+        }
+    }
+
+    private async Task SaveAddComment()
+    {
+        try
+        {
+            createFeedbackComments.UserId = authService.User.Id;
+            createFeedbackComments.FeedbackUserId = editFeedbackuser.Id;
+            await _feedBackCommentService.AddAsync(createFeedbackComments);
+
+            createFeedbackComments.User = authService.User;
+            editFeedbackuser.FeedbackComments.Add(createFeedbackComments);
+
+            createFeedbackComments = new FeedbackComment();
+
+            StateHasChanged();
+
+            CancelAdd();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con éxito",
+                    Title = "Comentario enviado"
+                });
+
+            await JSRuntime.InvokeVoidAsync("scrollToBottom");
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveAddImprovementUser()
+    {
+        try
+        {
+            createFeedbackImprovementUsers.FeedbackUserId = currentUserId;          
+            createFeedbackImprovementUsers.FeedbackImprovementId = createFeedbackImprovement.Id;
+
+            await _feedBackImprovementUserService.AddAsync(createFeedbackImprovementUsers);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+
+            editFeedbackuser = _feedBackUsers.First(x => x.Id == currentUserId);
+
+            changedState.InitChanges();
+            StateHasChanged();
+
+            var feedbackUserIdAsign = createFeedbackuser.Id;
+            CancelAdd();
+            createFeedbackuser.Id = feedbackUserIdAsign;
+
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con éxito",
+                    Title = "Agregar"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveEditImprovementUser()
+    {
+        try
+        {
+            editFeedbackImprovementUsers.Description = editDescriptionTemp;
+
+            await _feedBackImprovementUserService.EditAsync(editFeedbackImprovementUsers);
+
+            await OnHideModalImprovementUser();
+
+            await gridImprovementUser.RefreshDataAsync();
+
+            changedState.InitChanges();
+
+            CancelAdd();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con éxito",
+                    Title = "Editar Mejora"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task OnShowModalComment(FeedbackUser feedbackUser)
+    {
+        editFeedbackuser = feedbackUser;
+        await modalComments?.ShowAsync();
+    }
+
+    private async Task OnHideModalComment()
+    {
+        await modalComments?.HideAsync();
+    }
+
+    private async Task OnShowModalPeriod(FeedbackUser feedbackUser)
+    {
+        editFeedbackuser = feedbackUser;
+        await modalPeriod?.ShowAsync();
+    }
+
+    private async Task OnHideModalPeriod()
+    {
+        await modalPeriod?.HideAsync();
+    }
+
+    private async Task OnShowModalImprovement(FeedbackUser feedbackUser , long userId) 
+    {
+        currentUserId = userId;
+        selectedFeedBackUser = new FeedbackUser
+            {
+                Id = userId,              
+            };
+
+        editFeedbackuser = feedbackUser;
+        await modalImprovement?.ShowAsync();
+    }
+
+    private async Task OnHideModalImprovenment()
+    {
+        await modalImprovement?.HideAsync();
+    }
+
+    private async Task OnShowModalClickImprovementUser(FeedbackImprovementUser feedbackImprovementUser)
+    {
+        // Asignación correcta a la propiedad editFeedbackImprovementUsers
+        editFeedbackImprovementUsers = feedbackImprovementUser;
+
+        // Accede a la propiedad 'Description' correctamente
+        editDescriptionTemp = editFeedbackImprovementUsers.Description;
+
+        await modalImprovementUser?.ShowAsync();
+    }
+
+    private async Task OnHideModalImprovementUser()
+    {
+        await modalImprovementUser?.HideAsync();
+    }
+
+    private async Task ToggleContentAsync() => await collapseAddFeedBackUser.ToggleAsync();
+
+    private async Task ToggleCollapseTableAgregar() => await collapseAddImprovementUser.ToggleAsync();
+
+    private async Task ToggleActiveAsync(FeedbackUser feedbackUser)
+    {
+        if (feedbackUser == null) return;
+
+        feedbackUser.Active = !(feedbackUser.Active.HasValue && feedbackUser.Active.Value);
+
+        try
+        {
+            await _feedBackUserService.EditAsync(feedbackUser);
+
+            var action = feedbackUser.Active.Value ? "Activo" : "Inactivo";
+            ToastService.Notify(new ToastMessage
+                {
+                    Type = ToastType.Success,
+                    Message = $"El periodo se encuentra {action}.",
+                    Title = "Estado Actualizado"
+                });
+
+            StateHasChanged();
+
+            await GetGrid();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveDefinitiveDeleteUser(long Id)
+    {
+        try
+        {
+            await _feedBackUserService.DefinitiveDeleteAsync(Id);
+            await GetGrid();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Eliminar Periodo "
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error al borrar Feedback User",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveDefinitiveDeleteImprovementUsers(long Id)
+    {
+        try
+        {
+            await _feedBackImprovementUserService.DefinitiveDeleteAsync(Id);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+
+            editFeedbackuser = _feedBackUsers.First(x => x.Id == currentUserId);
+
+            changedState.InitChanges();
+            StateHasChanged();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Eliminar Periodo "
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error al borrar Periodo ",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task OnStandarTypeSelected(FeedbackPeriod period, long? value)
+    {
+        var selectedType = _feedBackStandarTypes.FirstOrDefault(t => t.Id == value);
+
+        period.FeedbackStandarTypeId = value;
+        period.FeedbackStandarType = selectedType;
+
+        await _feedBackPeriodService.EditAsync(period);
+
+        await gridPeriod.RefreshDataAsync();
+        StateHasChanged();
+    }
+}

@@ -1,0 +1,1242 @@
+﻿@using BlazorBootstrap;
+@using DataContext;
+@using DataModel.Enums;
+@using DataService.Auth;
+@using DataService.Interfaces.Management;
+@using DataService.State;
+@using DataService.Interfaces.ProjectManagement;
+
+@inherits Users;  
+
+@inject IUserService _service
+@inject IProfileService _profileService
+@inject IRoleService _roleService
+@inject ITeamService _teamService
+@inject IContractService _contractService
+@inject ISectionService _sectionService
+
+@inject AuthService authService
+@inject ChangedState changedState
+
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleContentAsync">Crear Usuario</Button>
+    </div>
+</div>
+<Collapse @ref="collapseAgregar">
+    <Card>
+        <CardBody>
+            <div class="row">
+                <div class="col-3">
+                    Nombre
+                </div>
+                <div class="col-3">
+                    Apellido
+                </div>
+                <div class="col-3">
+                    Roll On
+                </div>
+                <div class="col-3">
+                    Roll Off
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-3">
+                    <InputText Class="form-control" @bind-Value="@createUser.Firstname"></InputText>
+                </div>
+                <div class="col-3">
+                    <InputText Class="form-control" @bind-Value="@createUser.Lastname"></InputText>
+                </div>
+                <div class="col-3">
+                    <InputDate Class="form-control" @bind-Value="@createUser.RollOn"></InputDate>
+                </div>
+                <div class="col-3">
+                    <InputDate Class="form-control" @bind-Value="@createUser.RollOff"></InputDate>
+                </div>
+            </div>
+            <br />
+            <div class="row">
+                <div class="col-3">
+                    Usuario
+                </div>
+                <div class="col-3">
+                    Contraseña
+                </div>
+                <div class="col-3">
+                    Email
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-3">
+                    <InputText Class="form-control" @bind-Value="@createUser.Username"></InputText>
+                </div>
+                <div class="col-3">
+                    <InputText type="password" Class="form-control" @bind-Value="@createUser.Password"></InputText>
+                </div>
+                <div class="col-3">
+                    <InputText Class="form-control" @bind-Value="@createUser.Email"></InputText>
+                </div>
+            </div>
+            <br />
+            <div class="row">
+                <div class="col-3">
+                    Perfíl
+                </div>
+                <div class="col-3">
+                    Rol
+                </div>
+                <div class="col-3">
+                    Seniority
+                </div>
+                <div class="col-3">
+                    Superior
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-3">
+                    <InputSelect class="form-select" @bind-Value="createUser.ProfileId">
+                        <option selected value=-1 disabled>Seleccione</option>
+                        @foreach (var p in _profiles)
+                        {
+                            <option value=@p.Id>@p.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-3">
+                    <InputSelect class="form-select" @bind-Value="createUser.RoleId">
+                        <option selected value=-1 disabled>Seleccione</option>
+                        @foreach (var t in _roles)
+                        {
+                            <option value=@t.Id>@t.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-3">
+                    <InputSelect class="form-select" @bind-Value="createUser.Seniority">
+                        <option selected value="" disabled>Seleccione</option>
+                        <option value="Jr">Jr</option>
+                        <option value="Ssr">Ssr</option>
+                        <option value="Sr">Sr</option>
+                        <option value="Trainee">Trainee</option>
+                    </InputSelect>
+                </div>
+                <div class="col-3">
+                    <InputSelect class="form-select" @bind-Value="createUser.Superior">
+                        <option selected value=-1 disabled>Seleccione</option>
+                        <option value=-2>Ninguno</option>
+                        @foreach (var t in _usersSuperiors.Where(u => u.IsActive).ToList())
+                        {
+                            <option value=@t.Id>@t.UserFullName (@t.Username)</option>
+                        }
+                    </InputSelect>
+                </div>
+            </div>
+            <br />
+            <div class="row">
+                <div class="col-3">
+                    Externo
+                </div>
+                <div class="col-6">
+                    Detalle Externo
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-3">
+                    <InputSelect class="form-select" @bind-Value="createUser.IsExternal">
+                        <option selected value=false>No</option>
+                        <option value=true>Si</option>
+                    </InputSelect>
+                </div>
+                <div class="col-9">
+                    <InputText Class="form-control" @bind-Value="createUser.ExternalDetail" disabled="@(!createUser.IsExternal)"></InputText>
+                </div>
+            </div>
+            <br />
+            <div class="row">
+                <div class="col-3">
+                    Teléfono
+                </div>
+                <div class="col-3">
+                    Provincia
+                </div>
+                <div class="col-3">
+                    Cumpleaños
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-3">
+                    <InputText Class="form-control" @bind-Value="@createUser.PhoneNumber"></InputText>
+                </div>
+                <div class="col-3">
+                    <InputSelect class="form-select" @bind-Value="createUser.Province">
+                        <option selected value="" disabled>Seleccione</option>
+                        <option value="CABA">Ciudad Autónoma de Buenos Aires</option>
+                        <option value="Buenos Aires">Buenos Aires</option>
+                        <option value="Catamarca">Catamarca</option>
+                        <option value="Chaco">Chaco</option>
+                        <option value="Chubut">Chubut</option>
+                        <option value="Córdoba">Córdoba</option>
+                        <option value="Corrientes">Corrientes</option>
+                        <option value="Entre Ríos">Entre Ríos</option>
+                        <option value="Formosa">Formosa</option>
+                        <option value="Jujuy">Jujuy</option>
+                        <option value="La Pampa">La Pampa</option>
+                        <option value="La Rioja">La Rioja</option>
+                        <option value="Mendoza">Mendoza</option>
+                        <option value="Misiones">Misiones</option>
+                        <option value="Neuquén">Neuquén</option>
+                        <option value="Rio Negro">Rio Negro</option>
+                        <option value="Salta">Salta</option>
+                        <option value="San Juan">San Juan</option>
+                        <option value="San Luis">San Luis</option>
+                        <option value="Santa Cruz">Santa Cruz</option>
+                        <option value="Santa Fe">Santa Fe</option>
+                        <option value="Santiago del Estero">Santiago del Estero</option>
+                        <option value="Tierra del Fuego">Tierra del Fuego</option>
+                        <option value="Tucumán">Tucumán</option>
+                    </InputSelect>
+                </div>
+                <div class="col-3">
+                    <InputDate Class="form-control" @bind-Value="@createUser.Birth"></InputDate>
+                </div>
+            </div>
+            <br />
+            <div class="row">
+                <div class="col-6">
+                </div>
+                <div class="col-6">
+                    <div class="row">
+                        <div class="col-6">
+                        </div>
+                        <div class="col-3">
+                            <Button Class="btn btn-secondary form-control" onclick="@(() => CancelAdd())">
+                                Limpiar
+                            </Button>
+                        </div>
+                        <div class="col-3">
+                            <Button Class="btn btn-primary form-control" onclick="@(() => SaveAdd())">
+                                Crear
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </CardBody>
+    </Card>
+</Collapse>
+
+<br />
+<br />
+
+<Grid TItem="User" @ref="grid"
+      Class="table table-hover table-bordered table-striped"
+      Data="_users"
+      AllowSorting="true"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="8"
+      Responsive="true">
+
+    <GridColumn TItem="User" HeaderText="Id" TextNoWrap="true" SortKeySelector="item => item.Id" PropertyName="Id" FilterOperator="FilterOperator.Equals">
+        @context.Id
+    </GridColumn>
+
+    <GridColumn TItem="User" HeaderText="Nombre" FilterTextboxWidth="150" TextNoWrap="true" SortKeySelector="item => item.UserFullName" PropertyName="UserFullName" FilterOperator="FilterOperator.Contains">
+        @context.UserFullName
+    </GridColumn>
+
+    <GridColumn TItem="User" HeaderText="Usuario" FilterTextboxWidth="150" TextNoWrap="true" SortKeySelector="item => item.Username" PropertyName="Username" FilterOperator="FilterOperator.Contains">
+        @context.Username
+    </GridColumn>
+
+    <GridColumn TItem="User" HeaderText="Email" FilterTextboxWidth="150" TextNoWrap="true" SortKeySelector="item => item.Email" PropertyName="Email" FilterOperator="FilterOperator.Contains">
+        @context.Email
+    </GridColumn>
+
+    <GridColumn TItem="User" HeaderText="Perfil" TextNoWrap="true" SortKeySelector="item => item.Profile.Name" PropertyName="Profile.Name" FilterOperator="FilterOperator.Contains">
+        @context.ProfileName
+    </GridColumn>
+
+    <GridColumn TItem="User" HeaderText="Rol" TextNoWrap="true" SortKeySelector="item => item.RoleName" PropertyName="Role.Name" FilterOperator="FilterOperator.Contains">
+        @context.RoleName
+    </GridColumn>
+
+    <GridColumn TItem="User" HeaderText="Activo" SortKeySelector="item => item.IsActive" PropertyName="IsActive" FilterOperator="FilterOperator.Equals">
+        @if (context.IsActive)
+        {
+            <span class="oi oi-circle-check" aria-hidden="true" style="color: var(--l-green)"></span>
+        }
+        else
+        {
+            <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-red)"></span>
+        }
+    </GridColumn>
+
+    <GridColumn TItem="User" HeaderText="Responsable" SortKeySelector="item => item.SuperiorName" PropertyName="SuperiorName" Sortable="false" Filterable="false">
+        @foreach (var u in _users)
+        {
+            if (u.Id == context.Superior)
+            {
+                @u.Firstname @u.Lastname
+                break;
+            }
+        }
+    </GridColumn>
+
+    <GridColumn TItem="User" Freeze="true" FreezeRightPosition="0" FreezeDirection="FreezeDirection.Right" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="row">
+            <div class="col-12 d-flex">
+                <Button @onclick="async () => await OnShowModalClick(context, false)">
+                    <span class="oi oi-magnifying-glass" aria-hidden="true" title="Ver"></span>
+                </Button>
+
+                @if (authService.User.Permissions.Contains((long)SectionsEnum.Administrar))
+                {
+                   <Button @onclick="async () => await OnShowModalContractClick(context)"> 
+                     <span class="oi oi-script" aria-hidden="true" title="Contratos"></span>
+                   </Button>
+                }
+
+                @if (authService.User.Permissions.Contains((long)SectionsEnum.Administrar))
+                {
+                    <Button @onclick="async () => await OnShowCustomPermissionClick(context.Id)">
+                        <span class="oi oi-shield" aria-hidden="true" title="Permisos"></span>
+                    </Button>
+                }
+
+                <Button @onclick="async () => await OnShowModalClick(context)">
+                    <span class="oi oi-pencil" aria-hidden="true" title="Editar"></span>
+                </Button>
+
+                <Button @onclick="async () => await SaveDelete(context.Id)">
+                    <span class="oi oi-circle-x" aria-hidden="true" title="Eliminar" style="color: var(--l-red)"></span>
+                </Button>
+            </div>
+        </div>
+    </GridColumn>
+</Grid>
+
+<Modal @ref="modal" Title="Usuarios" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h4>
+                    <b>
+                        @if (modalEdit)
+                        {
+                            <div>Editar @modalUser.Firstname @modalUser.Lastname (@modalUser.Username)</div>
+                        }
+                        else
+                        {
+                            <div>Ver @modalUser.Firstname @modalUser.Lastname (@modalUser.Username)</div>
+                        }
+                    </b>
+                </h4>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-3">
+                Nombre
+            </div>
+            <div class="col-3">
+                Apellido
+            </div>
+            <div class="col-3">
+                Usuario
+            </div>
+            <div class="col-3">
+                Activo
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-3">
+                <InputText Class="form-control" @bind-Value="@modalUser.Firstname" disabled="@(!modalEdit)"></InputText>
+            </div>
+            <div class="col-3">
+                <InputText Class="form-control" @bind-Value="@modalUser.Lastname" disabled="@(!modalEdit)"></InputText>
+            </div>
+            <div class="col-3">
+                <InputText Class="form-control" @bind-Value="@modalUser.Username" disabled="@(!modalEdit)"></InputText>
+            </div>
+            <div class="col-3">
+                <InputSelect class="form-select" @bind-Value="modalUser.IsActive" disabled="@(!modalEdit)">
+                    <option value=false>No</option>
+                    <option value=true>Si</option>
+                </InputSelect>
+            </div>
+        </div>
+        <br />
+        <div class="row">
+            <div class="col-3">
+                Teléfono
+            </div>
+            <div class="col-3">
+                Cumpleaños
+            </div>
+            <div class="col-6">
+                Email
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-3">
+                <InputText Class="form-control" @bind-Value="@modalUser.PhoneNumber" disabled="@(!modalEdit)"></InputText>
+            </div>
+            <div class="col-3">
+                <InputDate Class="form-control" @bind-Value="@modalUser.Birth" disabled="@(!modalEdit)"></InputDate>
+            </div>
+            <div class="col-6">
+                <InputText Class="form-control" @bind-Value="@modalUser.Email" disabled="@(!modalEdit)"></InputText>
+            </div>
+        </div>
+        <br />
+        <div class="row">
+            <div class="col-3">
+                Perfíl
+            </div>
+            <div class="col-3">
+                Rol
+            </div>
+            <div class="col-3">
+                Seniority
+            </div>
+            <div class="col-3">
+                Superior
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-3">
+                <InputSelect class="form-select" @bind-Value="modalUser.ProfileId" disabled="@(!modalEdit)">
+                    <option selected value=-1 disabled>Seleccione</option>
+                    @foreach (var p in _profiles)
+                    {
+                        <option value=@p.Id>@p.Name</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-3">
+                <InputSelect class="form-select" @bind-Value="modalUser.RoleId" disabled="@(!modalEdit)">
+                    <option selected value=-1 disabled>Seleccione</option>
+                    @foreach (var t in _roles)
+                    {
+                        <option value=@t.Id>@t.Name</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-3">
+                <InputSelect class="form-select" @bind-Value="modalUser.Seniority" disabled="@(!modalEdit)">
+                    <option selected value="" disabled>Seleccione</option>
+                    <option value="Jr">Jr</option>
+                    <option value="Ssr">Ssr</option>
+                    <option value="Sr">Sr</option>
+                </InputSelect>
+            </div>
+            <div class="col-3">
+                <InputSelect class="form-select" @bind-Value="modalUser.Superior" disabled="@(!modalEdit)">
+                    <option selected value=-1 disabled>Seleccione</option>
+                    <option value=-2>Ninguno</option>
+                    @foreach (var t in _usersSuperiors.Where(x => x.IsActive).ToList())
+                    {
+                        <option value=@t.Id>@t.UserFullName (@t.Username)</option>
+                    }
+                </InputSelect>
+            </div>
+        </div>
+        <br />
+        <div class="row">
+            <div class="col-3">
+                Provincia
+            </div>
+            <div class="col-3">
+                Externo
+            </div>
+            <div class="col-6">
+                Detalle Externo
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-3">
+                <InputSelect class="form-select" @bind-Value="modalUser.Province" disabled="@(!modalEdit)">
+                    <option selected value="" disabled>Seleccione</option>
+                    <option value="CABA">Ciudad Autónoma de Buenos Aires</option>
+                    <option value="Buenos Aires">Buenos Aires</option>
+                    <option value="Catamarca">Catamarca</option>
+                    <option value="Chaco">Chaco</option>
+                    <option value="Chubut">Chubut</option>
+                    <option value="Córdoba">Córdoba</option>
+                    <option value="Corrientes">Corrientes</option>
+                    <option value="Entre Ríos">Entre Ríos</option>
+                    <option value="Formosa">Formosa</option>
+                    <option value="Jujuy">Jujuy</option>
+                    <option value="La Pampa">La Pampa</option>
+                    <option value="La Rioja">La Rioja</option>
+                    <option value="Mendoza">Mendoza</option>
+                    <option value="Misiones">Misiones</option>
+                    <option value="Neuquén">Neuquén</option>
+                    <option value="Rio Negro">Rio Negro</option>
+                    <option value="Salta">Salta</option>
+                    <option value="San Juan">San Juan</option>
+                    <option value="San Luis">San Luis</option>
+                    <option value="Santa Cruz">Santa Cruz</option>
+                    <option value="Santa Fe">Santa Fe</option>
+                    <option value="Santiago del Estero">Santiago del Estero</option>
+                    <option value="Tierra del Fuego">Tierra del Fuego</option>
+                    <option value="Tucumán">Tucumán</option>
+                </InputSelect>
+            </div>
+            <div class="col-3">
+                <InputSelect class="form-select" @bind-Value="modalUser.IsExternal" disabled="@(!modalEdit)">
+                    <option value=false>No</option>
+                    <option value=true>Si</option>
+                </InputSelect>
+            </div>
+            <div class="col-6">
+                <InputText class="form-control" @bind-Value="modalUser.ExternalDetail" disabled="@(!modalEdit || !modalUser.IsExternal)"></InputText>
+            </div>
+        </div>
+        <br />
+        <div class="row mt-2">
+            <div class="col-3">
+                Roll On
+            </div>
+            <div class="col-3">
+                Roll Off
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-3">
+                <InputDate Class="form-control" @bind-Value="modalUser.RollOn" disabled="@(!modalEdit)"></InputDate>
+            </div>
+            <div class="col-3">
+                <InputDate Class="form-control" @bind-Value="modalUser.RollOff" disabled="@(!modalEdit)"></InputDate>
+            </div>
+        </div>
+        <div class="row pt-3">
+            <div class="col-12" style="margin-top: 20px">
+                <h5>Equipos Asignados</h5>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-12">
+                @if (_userTeams.Count == 0)
+                {
+                    <div class="row">
+                        <div class="col-12 d-flex align-items-center">
+                            No hay usuarios asignados
+                        </div>
+                    </div>
+                }
+                else if (_userTeams.Count > 0)
+                {
+                    <div class="row" style="margin-bottom: 20px">
+                        <div class="col-4 d-flex align-items-center">
+                            Equipo
+                        </div>
+                        <div class="col-8 d-flex align-items-center">
+                            CECO
+                        </div>
+                    </div>
+
+                    foreach (var u in _userTeams)
+                    {
+                        <div class="row">
+                            <div class="col-4 d-flex align-items-center">
+                                @u.Name
+                            </div>
+                            <div class="col-8 d-flex align-items-center">
+                                @foreach (var p in u.Projects)
+                                {
+                                    @p.Name <label>&nbsp;&nbsp;</label>
+                                }
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Cerrar</Button>
+        </div>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="SaveEdit" disabled="@(!modalEdit)">Guardar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+<Modal @ref="modalUserContract" Title="Contratos" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h4><b>@userContract.UserFullName</b></h4>
+            </div>
+        </div>
+
+        <div class="row pt-2">
+            <div class="col-6">
+                <label class="form-label">Seleccionar Contrato</label>
+            </div>
+
+            <div class="col-6">
+                <label class="form-label">Importar horas</label>
+            </div>
+        </div>
+
+        <div class="row pt-1">
+            <div class="col-6">
+                <InputSelect class="form-select" @bind-Value="userClientContract.ClientContractId">
+                    <option selected value=-1>Seleccione</option>
+                    @foreach (var p in _clientContracts)
+                    {
+                        <option value="@p.Id">@p.Name</option>
+                    }
+                </InputSelect>
+            </div>
+
+            <div class="col-6">
+                <InputNumber Class="form-control" Step="0.5" @bind-Value="userClientContract.Hours"></InputNumber>
+            </div>
+        </div>
+
+        <div class="row pt-3">
+            <div class="col-3 offset-9">
+                <Button Class="btn btn-primary form-control" onclick="@(() => AddContract())">
+                    Agregar
+                </Button>
+            </div>
+        </div>
+
+        <div class="row pt-4">
+            <div class="col-6" style="margin-top: 20px">
+                <h5>Contratos asignados de @userContract.UserFullName:</h5>
+            </div>
+            <div class="col-6" style="margin-top: 20px">
+                <h5>Horas Importadas:</h5>
+            </div>
+        </div>
+
+        <div class="row pt-2">
+            <div class="col-12">
+                @if (_filteredUserClientContracts.Count == 0)
+                {
+                    <div class="row">
+                        <div class="col-12 d-flex align-items-center">
+                            No hay contratos agregados
+                        </div>
+                    </div>
+                }
+                else if (_filteredUserClientContracts.Count > 0)
+                    foreach (var u in _filteredUserClientContracts)
+                    {
+                        <div class="row pt-1">
+                            <div class="col-8 d-flex align-items-center">
+                                @u.ClientContract.Name
+                            </div>
+
+                            <div class="col-2 d-flex align-items-center">
+                                @u.Hours
+                            </div>
+
+                            <div class="col-2 d-flex align-items-center">
+                                <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="@(() => OnShowEditContractModal(u))">
+                                    <span class="oi oi-pencil" aria-hidden="true" style="color: var(--l-white)"></span>
+                                </Button>
+                                <Button Class="btn form-control ms-2" Color="ButtonColor.Primary" @onclick="@(() => DeleteContract(u.Id))">
+                                    <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-white)"></span>
+                                </Button>
+                            </div>
+
+                        </div>
+                    }
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Cerrar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+
+<Modal @ref="modalEditContract" Title="Editar Contrato" Size="ModalSize.Regular">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <label class="form-label">Contrato</label>
+                <InputSelect class="form-select" @bind-Value="editUserClientContract.ClientContractId">
+                    @foreach (var p in _clientContracts)
+                    {
+                        <option value="@p.Id">@p.Name</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-12 pt-2">
+                <label class="form-label">Horas</label>
+                <InputNumber Class="form-control" Step="0.5" @bind-Value="editUserClientContract.Hours"></InputNumber>
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="row">
+            <div class="col-6">
+                <Button Class="btn btn-primary form-control" @onclick="SaveEditContract">Guardar</Button>
+            </div>
+            <div class="col-6">
+                <Button Class="btn btn-secondary form-control" @onclick="OnHideEditContractModal">Cancelar</Button>
+            </div>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+
+<Modal @ref="modalCustomPermission" Title="Permisos Personalizados" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div>
+            <h5>Configurar permisos personalizados</h5>
+            <div class="form-group">
+                <label for="section">Seleccionar sección:</label>
+                <div class="col-6">
+                    <InputSelect class="form-select" @bind-Value="createCustomPermission.SectionId">
+                        <option selected value="-1" disabled>Seleccione</option>
+                        @foreach (var p in _sections.Where(s => !_customPermissions.Any(cp => cp.SectionId == s.Id)))
+                        {
+                            <option value="@p.Id">@p.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+            </div>
+        </div>
+
+        <div class="row pt-4">
+            <div class="col-6" style="margin-top: 20px">
+                <h5>Secciones asignadas:</h5>
+            </div>
+        </div>
+
+        <div class="row pt-2">
+            <div class="col-12">
+                @if (_filteredCustomPermissions != null && _filteredCustomPermissions.Any())
+                {
+                    @foreach (var p in _filteredCustomPermissions)
+                    {
+                        <div class="row pt-1">
+                            <div class="col-8 d-flex align-items-center">
+                                @p.Section.Name
+                            </div>
+
+                            <div class="col-2 d-flex align-items-center">
+                                 <Button Class="btn form-control ms-2" Color="ButtonColor.Primary" @onclick="@(() => DeleteCustomPermission(p.Id))">
+                                    <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-white)"></span>
+                                </Button> 
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="row">
+                        <div class="col-12 d-flex align-items-center">
+                            No se encontraron permisos personalizados.
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn btn-primary form-control" @onclick="SaveCustomPermission">Guardar</Button>
+        </div>
+        <div class="col-3">
+            <Button Class="btn btn-secondary form-control" @onclick="OnHideCustomPermissionClick">Cerrar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+
+
+
+@code {
+    [Inject] ToastService ToastService { get; set; }
+    private Collapse collapseAgregar;
+    private Grid<User> grid;
+
+    private Modal modal;
+    private Modal modalUserContract;
+    private Modal modalEditContract;
+    private Modal modalCustomPermission;
+
+    private User modalUser { get; set; } = new User() { RoleId = -1, ProfileId = -1, Province = "", Seniority = "", Superior = -1 };
+    private User createUser { get; set; } = new User() { RoleId = -1, ProfileId = -1, Province = "", Seniority = "", Superior = -1 };
+
+    private User userContract { get; set; } = new User();
+    private ClientContract clientContract { get; set; } = new ClientContract();
+
+    private UserClientContract userClientContract { get; set; } = new UserClientContract() { Hours = 160 };
+    private UserClientContract editUserClientContract = new UserClientContract() { Hours = 160 };
+
+    private CustomPermission selectedPermission = new CustomPermission();
+    private CustomPermission createCustomPermission = new CustomPermission();
+
+
+    private long currentUserId;
+    private bool modalEdit = false;
+
+    private List<User> _users = new List<User>();
+    private List<User> _usersSuperiors = new List<User>();
+    private List<Profile> _profiles = new List<Profile>();
+    private List<Role> _roles = new List<Role>();
+    private List<Team> _teams = new List<Team>();
+    private List<Team> _userTeams = new List<Team>();
+    private List<ClientContract> _clientContracts = new List<ClientContract>();
+
+    private List<UserClientContract> _userClientContracts = new List<UserClientContract>();
+    private List<UserClientContract> _filteredUserClientContracts = new List<UserClientContract>();
+
+
+    private List<CustomPermission> _customPermissions = new List<CustomPermission>();
+    private List<CustomPermission> _filteredCustomPermissions = new List<CustomPermission>();
+
+    private List<Section> _sections = new List<Section>();
+    private List<Section> _assignedSections = new List<Section>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetGrid();
+        await base.OnInitializedAsync();
+    }
+
+    protected override void OnInitialized()
+    {
+        userClientContract.ClientContractId = -1;
+        createCustomPermission.SectionId = -1;
+
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await GetCombo();
+    }
+
+    private async Task GetGrid()
+    {
+        try
+        {
+            _users = await _service.GetAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task GetCombo()
+    {
+        try
+        {
+            _profiles = (await _profileService.GetAsync()).Where(x => x.Active).ToList();
+            _roles = (await _roleService.GetAsync()).Where(x => x.Active).ToList();
+            _teams = await _teamService.GetAsync();
+
+            _clientContracts = await _contractService.GetAsync();
+            _userClientContracts = (await _contractService.GetUserClientContractAsync()).Where(x => x.UserId == currentUserId).ToList();
+
+            _usersSuperiors = _users.Where(u => u.Role.Hierarchy > 1).OrderBy(x => x.UserFullName).ToList();
+            _teams = _teams.Where(x => x.Active).ToList();
+            _sections = await _sectionService.GetAsync();
+
+            _customPermissions = (await _sectionService.GetCustomPermissionAsync()).Where(x => x.UserId == currentUserId).ToList();
+
+            foreach (var t in _teams)
+            {
+                t.Projects = t.Projects.Where(x => x.Active).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveAdd()
+    {
+        try
+        {
+
+            if (!string.IsNullOrEmpty(createUser.Username) && createUser.Username.Contains('@'))
+            {
+                createUser.Username = createUser.Username.Split('@')[0];
+            }
+
+            createUser.IsActive = true;
+
+            await _service.AddAsync(createUser);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+
+            changedState.InitChanges();
+
+            CancelAdd();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Crear Usuario"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task AddContract()
+    {
+        userClientContract.UserId = currentUserId;
+
+        try
+        {
+            await _contractService.AddUserClientContractAsync(userClientContract);
+
+            _userClientContracts = (await _contractService.GetUserClientContractAsync()).Where(x => x.UserId == currentUserId).ToList();
+
+            _filteredUserClientContracts = _userClientContracts;
+
+            await grid.RefreshDataAsync();
+            await GetGrid();
+
+
+            changedState.InitChanges();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Crear Equipo"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveCustomPermission()
+    {
+        createCustomPermission.UserId = currentUserId;
+
+        try
+        {
+            await _sectionService.AddCustomPermissionAsync(createCustomPermission);
+
+            _customPermissions = (await _sectionService.GetCustomPermissionAsync()).Where(x => x.UserId == currentUserId).ToList();
+
+            _filteredCustomPermissions = _customPermissions;
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+
+            changedState.InitChanges();
+
+            CancelAdd();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Asignar Permiso"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+
+    private void CancelAdd()
+    {
+        createUser = new User() { RoleId = -1, ProfileId = -1, Province = "", Seniority = "", Superior = -1 };
+        createCustomPermission.Id = default;
+    }
+
+    private async Task DeleteContract(long contractId)
+    {
+        try
+        {
+            await _contractService.DeleteUserContractAsync(contractId);
+
+            _filteredUserClientContracts = _filteredUserClientContracts.Where(x => x.ClientContractId != contractId).ToList();
+
+            _userClientContracts = (await _contractService.GetUserClientContractAsync()).Where(x => x.UserId == currentUserId).ToList();
+
+            _filteredUserClientContracts = _userClientContracts;
+
+            await grid.RefreshDataAsync();
+            await GetGrid();
+
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Contrato eliminado con éxito.",
+                    Title = "Eliminar Contrato"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task DeleteCustomPermission(long permissionId)
+    {
+        try
+        {
+            await _sectionService.DeleteCustomPermissionAsync(permissionId);
+
+            _filteredCustomPermissions = _filteredCustomPermissions.Where(x => x.Id != permissionId).ToList();
+
+            _customPermissions = (await _sectionService.GetCustomPermissionAsync()).Where(x => x.UserId == currentUserId).ToList();
+
+            _filteredCustomPermissions= _customPermissions;
+
+            await grid.RefreshDataAsync();
+            await GetGrid();
+
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Contrato eliminado con éxito.",
+                    Title = "Eliminar Contrato"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveEdit()
+    {
+        try
+        {
+            await _service.EditAsync(modalUser);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            await OnHideModalClick();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Editar Usuario"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveEditContract()
+    {
+        try
+        {
+
+            await _contractService.EditContractAsync(editUserClientContract);
+
+            _userClientContracts = (await _contractService.GetUserClientContractAsync()).Where(x => x.UserId == currentUserId).ToList();
+
+            _filteredUserClientContracts = _userClientContracts;
+
+
+            await grid.RefreshDataAsync();
+            await OnHideEditContractModal();
+
+
+            ToastService.Notify(new ToastMessage
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Editar Contrato"
+                });
+        }
+        catch (Exception ex)
+        {
+
+            ToastService.Notify(new ToastMessage
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error editar contrato"
+                });
+        }
+    }
+
+    private async Task SaveDelete(long Id)
+    {
+        try
+        {
+            await _service.DeleteAsync(Id);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            await OnHideModalClick();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Eliminar Usuario"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task OnShowModalClick(User user, bool editable = true)
+    {
+        modalUser = user;
+        modalUser.Province = modalUser.Province != null ? modalUser.Province.Trim() : "";
+        modalUser.Seniority = modalUser.Seniority != null ? modalUser.Seniority.Trim() : "";
+
+        modalEdit = editable;
+
+        _userTeams = _teams.Where(t => t.UserTeams.Any(ut => ut.UserId == modalUser.Id)).ToList();
+
+        await modal?.ShowAsync();
+    }
+
+    private async Task OnShowModalContractClick(User user)
+    {
+        userContract = user;
+
+        currentUserId = userContract.Id;
+
+        _userClientContracts = (await _contractService.GetUserClientContractAsync()).Where(x => x.UserId == currentUserId).ToList();
+
+        _filteredUserClientContracts = _userClientContracts;
+
+        await modalUserContract.ShowAsync();
+    }
+
+    private async Task OnShowEditContractModal(UserClientContract userContract)
+    {
+        editUserClientContract = userContract;
+       
+        await modalEditContract.ShowAsync();
+    }
+
+
+    private async Task OnShowCustomPermissionClick(long userId)
+    {
+        currentUserId = userId; 
+
+        _customPermissions = (await _sectionService.GetCustomPermissionAsync()).Where(x => x.UserId == currentUserId).ToList();
+
+        _filteredCustomPermissions = _customPermissions;
+
+        selectedPermission = new CustomPermission
+            {
+                UserId = userId,
+                
+            };
+
+        await modalCustomPermission.ShowAsync();
+    }
+
+
+    private async Task OnHideModalClick()
+    {
+        modalUser = new User() { RoleId = -1, ProfileId = -1, Province = "", Seniority = "", Superior = -1 };
+
+        await modal.HideAsync();
+        await modalUserContract.HideAsync();
+    }
+
+    private Task OnHideEditContractModal()
+    {
+        return modalEditContract.HideAsync();
+    }
+
+    private async Task OnHideCustomPermissionClick()
+    {
+        await modalCustomPermission.HideAsync();
+    }
+
+    private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
+
+    private void FilterUserClientContracts(long clientContractId)
+    {
+        _filteredUserClientContracts = _userClientContracts
+            .Where(m => m.ClientContractId == clientContractId)
+            .ToList();
+        StateHasChanged();
+    }
+
+    private void FilterAssignedPermissions(long userId)
+    {
+        _filteredCustomPermissions = _customPermissions
+            .Where(s => s.UserId == userId) 
+            .ToList();
+
+        StateHasChanged(); 
+    }
+
+}

@@ -1,0 +1,118 @@
+﻿@using BlazorBootstrap
+@using DataContext
+@using DataModel.Dto
+@using DataModel.Enums
+@using DataService.Auth
+@using DataService.Interfaces.Management
+@using DataService.Interfaces.ProjectManagement
+@using System.Globalization
+@using OfficeOpenXml;
+@using OfficeOpenXml.Table;
+@using System.IO;
+
+@inject IJSRuntime JS
+
+<div class="row">
+    <div class="col-12">
+        <Button Class="btn btn-success w-100" @onclick="DownloadExcel">Descargar Excel</Button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public List<ProgresoTarea> Progresos { get; set; }
+    [Parameter] public List<ProgresoHoras> Contratos { get; set; }
+    [Parameter] public List<HorasTareaRol> Perfiles { get; set; }
+
+    private async Task DownloadExcel()
+    {
+        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+
+        using var package = new ExcelPackage();
+        var worksheet = package.Workbook.Worksheets.Add("Planilla LLM");
+
+        worksheet.Cells[1, 1].Value = "Contrato";
+        worksheet.Cells[1, 2].Value = "Colaborador";
+        worksheet.Cells[1, 3].Value = "Perfil";
+        worksheet.Cells[1, 4].Value = "Responsable";
+        worksheet.Cells[1, 5].Value = "Proyecto";
+        worksheet.Cells[1, 6].Value = "# RM";
+        worksheet.Cells[1, 7].Value = "Titulo";
+        worksheet.Cells[1, 8].Value = "Fecha Inicio";
+        worksheet.Cells[1, 9].Value = "Fecha Entrega";
+        worksheet.Cells[1, 10].Value = "Horas Estimadas";
+        worksheet.Cells[1, 11].Value = "Total Horas";
+        worksheet.Cells[1, 12].Value = "% Avance Total";
+        worksheet.Cells[1, 13].Value = "Hrs Incurridas";
+        worksheet.Cells[1, 14].Value = "Avance Realizado en la Semana";
+        worksheet.Cells[1, 15].Value = "% Avance Semanal";
+        worksheet.Cells[1, 16].Value = "% Proyecto Proxima Semana";
+
+        for (int i = 0; i < Progresos.Count; i++)
+        {
+            worksheet.Cells[i + 2, 1].Value = Progresos[i].Contrato;
+            worksheet.Cells[i + 2, 2].Value = Progresos[i].Colaborador;
+            worksheet.Cells[i + 2, 3].Value = Progresos[i].Perfil;
+            worksheet.Cells[i + 2, 4].Value = Progresos[i].Responsable;
+            worksheet.Cells[i + 2, 5].Value = Progresos[i].Proyecto;
+            worksheet.Cells[i + 2, 6].Value = Progresos[i].RM;
+            worksheet.Cells[i + 2, 7].Value = Progresos[i].Titulo;
+            worksheet.Cells[i + 2, 8].Value = Progresos[i].FechaInicio.HasValue ? Progresos[i].FechaInicio.Value.ToString("dd/MM/yyyy") : "";
+            worksheet.Cells[i + 2, 9].Value = Progresos[i].FechaEntrega.HasValue ? Progresos[i].FechaEntrega.Value.ToString("dd/MM/yyyy") : "";
+            worksheet.Cells[i + 2, 10].Value = Progresos[i].TotalHoras.HasValue ? Progresos[i].TotalHoras.Value.ToString("0.00") : "0.00";
+            worksheet.Cells[i + 2, 11].Value = Progresos[i].HorasEstimadas.HasValue ? Progresos[i].HorasEstimadas.Value.ToString("0.00") : "0.00";
+            worksheet.Cells[i + 2, 12].Value = Progresos[i].PorcentajeAvance.HasValue ? Progresos[i].PorcentajeAvance.Value.ToString("0.00") : "0.00";
+            worksheet.Cells[i + 2, 13].Value = Progresos[i].HorasSemanales.HasValue ? Progresos[i].HorasSemanales.Value.ToString("0.00") : "0.00";
+            worksheet.Cells[i + 2, 14].Value = Progresos[i].AvanceSemanaPasada.HasValue ? Progresos[i].AvanceSemanaPasada.Value.ToString("0.00") : "0.00";
+            worksheet.Cells[i + 2, 16].Value = Progresos[i].AvanceSemanaActual.HasValue ? Progresos[i].AvanceSemanaActual.Value.ToString("0.00") : "0.00";
+            worksheet.Cells[i + 2, 17].Value = Progresos[i].ProyeccionSemanaProxima.HasValue ? Progresos[i].ProyeccionSemanaProxima.Value.ToString("0.00") : "0.00";
+        }
+
+        worksheet.Cells[worksheet.Dimension.Address].AutoFitColumns();
+
+        // -------------------------------------------------------------------------------------------------------------
+
+        var worksheet2 = package.Workbook.Worksheets.Add("Horas por Contrato");
+
+        worksheet2.Cells[1, 1].Value = "Contrato CFO";
+        worksheet2.Cells[1, 2].Value = "Contrato Cliente";
+        worksheet2.Cells[1, 3].Value = "Horas Contrato";
+        worksheet2.Cells[1, 4].Value = "Horas Imputadas";
+        worksheet2.Cells[1, 5].Value = "Diferencia Horas";
+
+        for (int i = 0; i < Contratos.Count; i++)
+        {
+            worksheet2.Cells[i + 2, 1].Value = Contratos[i].ContratoCFO;
+            worksheet2.Cells[i + 2, 2].Value = Contratos[i].ContratoCliente;
+            worksheet2.Cells[i + 2, 3].Value = Contratos[i].HorasContrato;
+            worksheet2.Cells[i + 2, 4].Value = Contratos[i].HorasImputadasMes;
+            worksheet2.Cells[i + 2, 5].Value = Contratos[i].DiferenciaHoras;
+        }
+
+        worksheet2.Cells[worksheet2.Dimension.Address].AutoFitColumns();
+        
+        // -------------------------------------------------------------------------------------------------------------
+
+        var worksheet3 = package.Workbook.Worksheets.Add("Horas por Perfil");
+
+        worksheet3.Cells[1, 1].Value = "Tarea";
+        worksheet3.Cells[1, 2].Value = "Perfil";
+        worksheet3.Cells[1, 3].Value = "Horas";
+
+        for (int i = 0; i < Perfiles.Count; i++)
+        {
+            worksheet3.Cells[i + 2, 1].Value = Perfiles[i].Tarea;
+            worksheet3.Cells[i + 2, 2].Value = Perfiles[i].Perfil;
+            worksheet3.Cells[i + 2, 3].Value = Perfiles[i].Horas;
+        }
+
+        worksheet3.Cells[worksheet3.Dimension.Address].AutoFitColumns();
+
+        var stream = new MemoryStream();
+        package.SaveAs(stream);
+        var fileBytes = stream.ToArray();
+
+        var base64 = Convert.ToBase64String(fileBytes);
+
+        await JS.InvokeVoidAsync("downloadFileFromStream", base64, $"Planilla Semanal de Servicio {DateTime.Now.ToString("yyyyMMdd")}.xlsx");
+    }
+}

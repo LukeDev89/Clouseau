@@ -1,0 +1,225 @@
+﻿@using BlazorBootstrap
+@using DataContext
+@using DataModel.Dto
+@using DataModel.Enums
+@using DataService.Auth
+@using DataService.Interfaces.Management
+@using DataService.Interfaces.ProjectManagement
+@using System.Globalization
+@using OfficeOpenXml;
+@using OfficeOpenXml.Table;
+@using System.IO;
+@using Website.Client.Pages.ProjectManagement.Queries.ExportButton
+
+@inherits Queries
+
+@inject IUserNonworkingDaysService _userNonworkingDaysService
+
+@inject IUserService _userService
+@inject AuthService _authService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject IJSRuntime JS
+@inject NavigationManager navigationManager
+
+<div class="row">
+    <div class="col-2">
+        Desde
+    </div>
+    <div class="col-2">
+        Hasta
+    </div>
+</div>
+<div class="row">
+    <div class="col-2">
+        <DateInput Class="form-control" @bind-Value="@fromDate"></DateInput>
+    </div>
+    <div class="col-2">
+        <DateInput Class="form-control" @bind-Value="@toDate"></DateInput>
+    </div>
+    <div class="col-2">
+        <Button Class="btn btn-primary w-100" @onclick="onFilter">Filtrar</Button>
+    </div>
+    <div class="col-2">
+        <Button Class="btn btn-secondary w-100" @onclick="onClear">Limpiar</Button>
+    </div>
+    <div class="col-2">
+        <ExportLicensesPerUserExcelButton UserNonworkingDays="_userNonworkingDays" />
+    </div>
+</div>
+
+<br />
+<br />
+
+<div class="row" style="overflow-x: auto;">
+    <div class="col-12">
+        <table class="table table-hover table-bordered table-striped text-nowrap sticky-table">
+            <thead>
+                <tr>
+                    <th>Integrante</th>
+                    <th>Tipo</th>
+                    <th>Solicitado</th>
+                    <th>Desde</th>
+                    <th>Hasta</th>
+                    <th>Comentario</th>
+                    <th>Motivo Rechazo</th>
+                    <th>Documentación</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var e in _userNonworkingDays)
+                {
+                    <tr>
+                        <td>@e.User.UserFullName</td>
+                        <td>@e.Type.Name</td>
+                        <td>@e.Created.ToString("dd/MM/yyyy")</td>
+                        <td>@e.DateFrom.ToString("dd/MM/yyyy")</td>
+                        <td>@e.DateTo.ToString("dd/MM/yyyy")</td>
+                        <td>@e.Comment</td>
+                        <td>@e.CommentCfo</td>
+                        <td>@(string.IsNullOrEmpty(e.Path) ? "No" : "Si")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    [Inject] ToastService ToastService { get; set; }
+    [Inject] protected PreloadService PreloadService { get; set; }
+
+    private bool _errorOccurred = false;
+
+    private DateOnly fromDate = new DateOnly(DateTime.Now.Year, DateTime.Now.Month, 1);
+    private DateOnly toDate = DateOnly.FromDateTime(DateTime.Now);
+
+    private List<UserNonworkingDay> _userNonworkingDays = new List<UserNonworkingDay>();
+
+    private int _month = DateTime.Now.Month;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (_errorOccurred)
+            {
+                await localStorage.ClearAsync();
+
+                ToastService.Notify(new ToastMessage()
+                    {
+                        Type = ToastType.Danger,
+                        Message = "Error inesperado al realizar la acción",
+                        Title = "Error"
+                    });
+
+                navigationManager.NavigateTo("/");
+            }
+            else
+            {
+                if (!_authService.IsLoggedIn)
+                {
+                    navigationManager.NavigateTo("/");
+                }
+                else
+                {
+                    var uri = navigationManager.Uri;
+                    await localStorage.SetItemAsync("lastUrl", uri);
+                    await localStorage.SetItemAsync("huboRecarga", false);
+                }
+            }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            PreloadService.Show();
+            await GetGrid();
+            await GetCombo();
+            await base.OnInitializedAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorOccurred = true;
+        }
+        finally
+        {
+            PreloadService.Hide();
+        }
+    }
+
+    private async Task GetCombo()
+    {
+
+    }
+
+    private async Task GetGrid()
+    {
+        try
+        {
+            if (_authService.User.ProfileId == (short)ProfileTypes.GestorProyectos)
+            {
+                _userNonworkingDays = (await _userNonworkingDaysService.GetAsync())
+                    .Where(n => DateOnly.FromDateTime(n.Created) >= fromDate && DateOnly.FromDateTime(n.Created) <= toDate && (n.UserId == _authService.User.Id || n.User.Superior == _authService.User.Id) && n.State == (short)NonworkingStatus.Approved)
+                    .OrderBy(x => x.State).ThenByDescending(x => x.Created).ToList();
+            }
+            else
+            {
+                _userNonworkingDays = (await _userNonworkingDaysService.GetAsync())
+                    .Where(n => n.State == (short)NonworkingStatus.Approved && DateOnly.FromDateTime(n.Created) >= fromDate && DateOnly.FromDateTime(n.Created) <= toDate)
+                    .OrderBy(x => x.State).ThenByDescending(x => x.Created).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task onFilter()
+    {
+        try
+        {
+            await GetGrid();
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task onClear()
+    {
+        try
+        {
+            fromDate = new DateOnly(DateTime.Now.Year, DateTime.Now.Month, 1);
+            toDate = DateOnly.FromDateTime(DateTime.Now);
+
+            await GetGrid();
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+}

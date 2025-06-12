@@ -1,0 +1,278 @@
+﻿@using BlazorBootstrap
+@using DataContext
+@using DataService.Interfaces.Management;
+@using DataService.State;
+
+@inherits TaskTypes
+
+@inject ITaskTypeService _service
+
+@inject ChangedState changedState
+
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleContentAsync">
+            Crear Tipo de Tarea
+        </Button>
+    </div>
+</div>
+<Collapse @ref="collapseAgregar">
+    <Card>
+        <CardBody>
+            <div class="row">
+                <div class="col-4">
+                    Nombre
+                </div>
+                <div class="col-4">
+                    Descripción
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-4">
+                    <InputText Class="form-control" @bind-Value="@createTaskType.Name"></InputText>
+                </div>
+                <div class="col-4">
+                    <InputText Class="form-control" @bind-Value="@createTaskType.Description"></InputText>
+                </div>
+                <div class="col-4">
+                    <div class="row">
+                        <div class="col-6">
+                            <Button Class="btn btn-secondary form-control" onclick="@(() => CancelAdd())">
+                                Limpiar
+                            </Button>
+                        </div>
+                        <div class="col-6">
+                            <Button Class="btn btn-primary form-control" onclick="@(() => SaveAdd())">
+                                Crear
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </CardBody>
+    </Card>
+</Collapse>
+
+<br />
+<br />
+
+<Grid TItem="TaskType" @ref="grid"
+      Class="table table-hover table-bordered table-striped"
+      Data="_taskTypes"
+      AllowSorting="true"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="8"
+      Responsive="true">
+
+    <GridColumn TItem="TaskType" HeaderText="Nombre" SortKeySelector="item => item.Name" PropertyName="Name" FilterOperator="FilterOperator.Contains">
+        @context.Name
+    </GridColumn>
+
+    <GridColumn TItem="TaskType" HeaderText="Descripción" SortKeySelector="item => item.Description" PropertyName="Description" FilterOperator="FilterOperator.Contains">
+        @context.Description
+    </GridColumn>
+
+    <GridColumn TItem="TaskType" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="row">
+            <div class="col-12 d-flex">
+                <Button @onclick="async () => await OnShowModalClick(context)">
+                    <span class="oi oi-pencil" aria-hidden="true" title="Editar"></span>
+                </Button>
+
+                <Button @onclick="async () => await SaveDelete(context.Id)">
+                    <span class="oi oi-circle-x" aria-hidden="true" title="Eliminar" style="color: var(--l-red)"></span>
+                </Button>
+            </div>
+        </div>
+    </GridColumn>
+</Grid>
+
+<Modal @ref="modal" Title="Notificación" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h4><b>@modalName</b></h4>
+            </div>
+        </div>
+        <div class="row" style="margin-top: 25px">
+            <div class="col-3">
+                Nombre
+            </div>
+            <div class="col-6">
+                Descripcion
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-3">
+                <InputText Class="form-control" @bind-Value="@editTaskType.Name"></InputText>
+            </div>
+            <div class="col-6">
+                <InputText Class="form-control" @bind-Value="@editTaskType.Description"></InputText>
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Cerrar</Button>
+        </div>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="SaveEdit">Guardar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+@code {
+    [Inject] ToastService ToastService { get; set; }
+    private Collapse collapseAgregar;
+    private Grid<TaskType> grid;
+
+    private Modal modal;
+    private long modalId { get; set; }
+    private string modalName { get; set; } = "";
+    private string modalDescription { get; set; } = "";
+    private TaskType editTaskType { get; set; } = new TaskType();
+
+    private string createName { get; set; } = "";
+    private string createDescription { get; set; } = "";
+    private TaskType createTaskType { get; set; } = new TaskType();
+
+
+    private List<TaskType> _taskTypes = new List<TaskType>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetGrid();
+        await base.OnInitializedAsync();
+    }
+
+    private async Task GetGrid()
+    {
+        try
+        {
+            _taskTypes = await _service.GetAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveAdd()
+    {
+        try
+        {
+            await _service.AddAsync(createTaskType);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            CancelAdd();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Crear Tipo Tarea"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private void CancelAdd()
+    {
+        createName = "";
+        createDescription = "";
+    }
+
+    private async Task SaveEdit()
+    {
+        try
+        {
+            await _service.EditAsync(editTaskType);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            await OnHideModalClick();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Editar Tipo Tarea"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveDelete(long id)
+    {
+        try
+        {
+            await _service.DeleteAsync(id);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            await OnHideModalClick();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Eliminar Tipo Tarea"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task OnShowModalClick(TaskType taskType)
+    {
+        //modalId = id;
+        //modalName = name;
+        //modalDescription = description;
+        editTaskType = taskType;
+
+        await modal?.ShowAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        editTaskType.Id = 0;
+        editTaskType.Name = "";
+        editTaskType.Description = "";
+
+        await modal?.HideAsync();
+    }
+
+    private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
+}

@@ -1,0 +1,372 @@
+﻿@using BlazorBootstrap
+@using DataService.Interfaces.Management;
+@using DataService.State;
+@using DataContext;
+
+@inherits Contracts
+
+@inject IClientService _service
+@inject IContractService _contractService
+
+@inject ChangedState changedState
+
+<br />
+
+<div class="row">
+	<div class="col-12">
+		<Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleContentAsync">
+			Asignar Contratos
+		</Button>
+	</div>
+</div>
+<Collapse @ref="collapseAgregar">
+	<Card>
+		<CardBody>
+			<div class="row">
+				<div class="col-5">
+					<div class="row">
+						<div class="col-12">
+							<label>Cliente</label>
+							<InputSelect class="form-select" @bind-Value="createClient.Id">
+								<option value="-1" disabled="@(createClient.Id != -1)">Seleccione</option>
+								@foreach (var p in _clients)
+								{
+									<option value="@p.Id">@p.Name</option>
+								}
+							</InputSelect>
+						</div>
+					</div>
+
+					<div class="row mt-3">
+						<div class="col-12">
+							<label>Nombre del Contrato</label>
+							<InputText class="form-control" @bind-Value="@createContract.Name"></InputText>
+						</div>
+					</div>
+				</div>
+
+				<div class="col-7">
+					<div class="row h-100">
+						<div class="col-12 d-flex flex-column">
+							<label>Descripción del Contrato</label>
+							<textarea class="form-control flex-grow-1" @bind="@createContract.Description"></textarea>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<div class="row mt-4 justify-content-end">
+				<div class="col-3">
+					<div class="row">
+						<div class="col-6">
+							<Button class="btn btn-secondary form-control" onclick="@(() => CancelAdd())">
+								Limpiar
+							</Button>
+						</div>
+						<div class="col-6">
+							<Button class="btn btn-primary form-control" onclick="@(() => SaveAdd())">
+								Crear
+							</Button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</CardBody>
+	</Card>
+</Collapse>
+
+
+
+
+<br />
+<br />
+
+<Grid TItem="ClientContract" @ref="grid"
+	  Class="table table-hover table-bordered table-striped"
+	  Data="_contracts"
+	  AllowSorting="true"
+	  AllowFiltering="true"
+	  AllowPaging="true"
+	  PageSize="10"
+	  Responsive="true">
+
+	<GridColumn TItem="ClientContract" HeaderText="Cliente" SortKeySelector="item => item.Client.Name" PropertyName="ClientName" FilterOperator="FilterOperator.Contains">
+		@context.Client.Name
+	</GridColumn>
+
+	<GridColumn TItem="ClientContract" HeaderText="Nombre" SortKeySelector="item => item.Name" PropertyName="Name" FilterOperator="FilterOperator.Contains">
+		@context.Name
+	</GridColumn>
+
+	<GridColumn TItem="ClientContract" HeaderText="Descripción" SortKeySelector="item => item.Description" PropertyName="Description" FilterOperator="FilterOperator.Contains">
+		@context.Description
+	</GridColumn>
+
+	<GridColumn TItem="ClientContract" HeaderText="Acciones" Sortable="false" Filterable="false">
+		<div class="row">
+			<div class="col-12 d-flex">
+				<Button @onclick="async () => await OnShowModalClick(context)">
+					<span class="oi oi-pencil" aria-hidden="true" title="Editar"></span>
+				</Button>
+
+				<Button @onclick="async () => await SaveDefinitiveDelete(context.Id)">
+					<span class="oi oi-circle-x" aria-hidden="true" title="Eliminar" style="color: var(--l-red)"></span>
+				</Button>
+			</div>
+		</div>
+	</GridColumn>
+</Grid>
+
+<Modal @ref="modal" Title="Editar Contrato" Size="ModalSize.Large">
+	<BodyTemplate>
+		<div class="row">
+			<div class="col-12">
+				<h4><b>@editContract.Name / @editContract.Client.Name </b></h4>
+			</div>
+		</div>
+
+		<div class="row">
+			<div class="col-8">
+				Cliente
+			</div>
+		</div>
+		<div class="row mt-2">
+			<div class="col-3">
+				<InputSelect class="form-select" @bind-Value="editContract.ClientId">
+					<option value="-1" disabled="@(editContract.ClientId!= -1)">Seleccione</option>
+					@foreach (var p in _clients)
+					{
+						<option value="@p.Id">@p.Name</option>
+					}
+				</InputSelect>
+			</div>
+		</div>
+
+		<div class="row" style="margin-top: 25px">
+			<div class="col-6">
+				Nombre
+			</div>
+		</div>
+		<div class="row mt-2">
+			<div class="col-6">
+				<InputText Class="form-control" @bind-Value="@editContract.Name"></InputText>
+			</div>
+		</div>
+
+		<div class="row" style="margin-top: 25px">
+			<div class="col-6">
+				Descripción
+			</div>
+		</div>
+		<div class="row mt-2">
+			<div class="col-6">
+				<textarea Class="form-control" @bind="@editContract.Description"></textarea>
+			</div>
+		</div>
+
+	</BodyTemplate>
+	<FooterTemplate>
+		<div class="col-3">
+			<Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Cerrar</Button>
+		</div>
+		<div class="col-3">
+			<Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="SaveEdit">Guardar</Button>
+		</div>
+	</FooterTemplate>
+</Modal>
+
+@code {
+	[Inject] ToastService ToastService { get; set; }
+	private Collapse collapseAgregar;
+	private Grid<ClientContract> grid;
+
+	private Modal modal;
+	private long modalId { get; set; }
+	private string modalName { get; set; } = "";
+
+	private Client editClient { get; set; } = new Client();
+	private Client createClient { get; set; } = new Client();
+
+	private ClientContract editContract { get; set; } = new ClientContract();
+	private ClientContract createContract { get; set; } = new ClientContract();
+
+	private List<Client> _clients = new List<Client>();
+	private List<ClientContract> _contracts = new List<ClientContract>();
+
+	protected override async Task OnInitializedAsync()
+	{
+		changedState.ChangeAction += StateHasChanged;
+
+		await GetGrid();
+		await GetCombos();
+		await base.OnInitializedAsync();
+	}
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		await GetCombos();
+	}
+
+	public void Dispose()
+	{
+		changedState.ChangeAction -= StateHasChanged;
+	}
+
+	private async Task GetCombos()
+	{
+		try
+		{
+			_clients = await _service.GetAsync();
+		}
+		catch (Exception ex)
+		{
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Danger,
+					Message = "Error inesperado al realizar la acción",
+					Title = "Error"
+				});
+		}
+	}
+
+	private async Task GetGrid()
+	{
+		try
+		{
+			_contracts = await _contractService.GetAsync();
+		}
+		catch (Exception ex)
+		{
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Danger,
+					Message = "Error inesperado al realizar la acción",
+					Title = "Error"
+				});
+		}
+	}
+
+	private async Task SaveAdd()
+	{
+
+		createContract.ClientId = createClient.Id;
+
+		try
+		{
+			await _contractService.AddAsync(createContract);
+
+			createContract = new ClientContract();
+
+			await GetGrid();
+			await grid.RefreshDataAsync();
+
+			changedState.InitChanges();
+
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Success,
+					Message = "Contrato guardado con exito.",
+					Title = "Contrato Guardado"
+				});
+
+			CancelAdd();
+		}
+		catch (Exception ex)
+		{
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Danger,
+					Message = "Error inesperado al realizar la acción",
+					Title = "Error"
+				});
+		}
+	}
+
+	private void CancelAdd()
+	{
+		createClient.Id = default;
+		createContract.Name= "";
+		createContract.Description= "";
+	}
+
+	private async Task SaveEdit()
+	{	
+		try
+		{
+			await _contractService.EditAsync(editContract);
+	
+			await GetGrid();
+			await grid.RefreshDataAsync();
+			await OnHideModalClick();
+		
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Success,
+					Message = "Contrato editado con exito.",
+					Title = "Contrato Editado"
+				});
+		}
+		catch (Exception ex)
+		{
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Danger,
+					Message = "Error inesperado al realizar la acción",
+					Title = "Error"
+				});
+		}
+
+	}
+
+	private async Task SaveDefinitiveDelete(long Id)
+	{
+		try
+		{
+			await _contractService.DefinitiveDeleteAsync(Id);
+
+			await GetGrid();
+			await grid.RefreshDataAsync();
+			await OnHideModalClick();
+
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Success,
+					Message = "Contrato eliminado con exito.",
+					Title = "Contrato Eliminado"
+				});
+		}
+		catch (Exception ex)
+		{
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Danger,
+					Message = "Error inesperado al realizar la acción",
+					Title = "Error"
+				});
+		}
+	}
+
+	private async Task OnShowModalClick(ClientContract clientContract)
+	{
+		editContract = clientContract;
+
+		await modal?.ShowAsync();
+	}
+
+	private async Task OnHideModalClick()
+	{
+
+		editContract.ClientId = -1;
+		
+		await modal?.HideAsync();
+	}
+
+	private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
+
+	protected override void OnInitialized()
+	{
+		createClient.Id = -1;
+		editContract.ClientId = -1;
+		base.OnInitialized();
+	}
+}

@@ -1,0 +1,320 @@
+﻿@using BlazorBootstrap
+@using DataContext
+@using DataModel.Dto
+@using DataModel.Enums
+@using DataService.Auth
+@using DataService.Interfaces.Management
+@using DataService.Interfaces.ProjectManagement
+@using System.Globalization
+
+@inherits Queries
+
+@inject IProjectTaskService _projectTaskService
+@inject ITaskProgressService _taskProgressService
+@inject ITaskTypeService _taskTypeService
+@inject IUserService _userService
+@inject AuthService _authService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+@inject NavigationManager navigationManager;
+
+<div class="row">
+    <div class="col-12">
+        <div class="row">
+            <div class="col-4">
+                <InputSelect class="form-select" ValueExpression="@(() => filterUser)" Value="filterUser" ValueChanged="@(async (long value) => await GetGrid(filterUser, value))">
+                    <option selected value=-1 disabled>Seleccione</option>
+                    @foreach (var u in _users.Where(u => u.IsActive).OrderBy(x => x.UserFullName))
+                    {
+                        <option value=@u.Id>@u.UserFullName (@u.Username)</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-2 d-flex justify-content-start align-items-center">
+                <DateInput Style="display: none" Class="form-control" Disabled="false" TValue="DateOnly" Value="filterDate" ValueExpression="() => filterDate" ValueChanged="async (value) => await OnFilterDateChanged(value)"></DateInput>
+                <span style="text-align: center; vertical-align: middle">
+                    @filterDate.ToString("MMMM", CultureInfo.CreateSpecificCulture("es")).ToUpper() @filterDate.Year
+                </span>
+            </div>
+            <div class="col-1">
+                <Button Style="width: 100%" @onclick="() => ChangeDateLess()">
+                    <span class="oi oi-chevron-left" aria-hidden="true" title="Atras"></span>
+                </Button>
+            </div>
+            <div class="col-1">
+                <Button Style="width: 100%" @onclick="() => ChangeDatePlus()">
+                    <span class="oi oi-chevron-right" aria-hidden="true" title="Adelante"></span>
+                </Button>
+            </div>
+            <div class="col-6">
+            </div>
+            <div class="col-2">
+            </div>
+        </div>
+    </div>
+</div>
+
+<br />
+
+<div class="row" style="overflow-x: auto;">
+    <div class="col-12">
+        <table class="table table-hover table-bordered table-striped text-nowrap sticky-table">
+            <thead>
+                <tr>
+                    <th>Proyecto</th>
+                    <th>Tarea</th>
+                    <th>Tipo</th>
+                    @foreach (var d in _daysToShow)
+                    {
+                        <th style="text-align: right">@d.ToString("dd")</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var taskEntry in _workPerTaskToShow
+                .GroupBy(x => new { x.Task, x.TaskType })
+                .Select(g => g.First())
+                .OrderBy(x => x.Project)
+                .ToList())
+                {
+                    <tr>
+                        <td>@taskEntry.Project</td>
+                        <td>@taskEntry.Task</td>
+                        <td>@taskEntry.TaskType</td>
+                        @foreach (var date in _daysToShow)
+                        {
+                            <td align="right">
+                                @{
+                                    var hoursForDate = _workPerTaskToShow
+                                    .Where(x => x.Date == date && x.Task == taskEntry.Task && x.TaskType == taskEntry.TaskType)
+                                    .Sum(x => x.Hours);
+                                }
+                                @hoursForDate
+                            </td>
+                        }
+                    </tr>
+                }
+                <tr>
+                    <td></td>
+                    <td colspan="2" align="right"><strong>Total Horas por Día</strong></td>
+                    @foreach (var date in _daysToShow)
+                    {
+                        var total = _workPerTaskToShow.Where(x => x.Date == date).Sum(x => x.Hours);
+
+                        string statusColor;
+                        string moodFace;
+
+                        if (total >= 8)
+                        {
+                            statusColor = "var(--l-green)";
+                            moodFace = "sentiment_very_satisfied";
+                        }
+                        else if (total > 0)
+                        {
+                            statusColor = "var(--l-yellow)";
+                            moodFace = "sentiment_neutral";
+                        }
+                        else
+                        {
+                            statusColor = "var(--l-red)";
+                            moodFace = "sentiment_very_dissatisfied";
+                        }
+
+                        <td align="right">
+                            <div style="margin: auto; text-align: center; vertical-align: middle; display: flex; align-items: center; justify-content: end">
+                                <strong>
+                                    &nbsp;&nbsp; @total
+                                </strong>
+                            </div>
+                            <div style="width: 50px; height: 2px; background-color: @statusColor">
+                            </div>
+                        </td>
+                    }
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    [Inject] ToastService ToastService { get; set; }
+    [Inject] protected PreloadService PreloadService { get; set; }
+    private bool _errorOccurred = false;
+
+    private long filterUser { get; set; } = -1;
+    private DateOnly filterDate = DateOnly.FromDateTime(DateTime.Today);
+
+    private List<User> _users = new List<User>();
+
+    private List<ProjectTask> _projectTask = new List<ProjectTask>();
+    private List<ProjectTask> _projectTaskToShow = new List<ProjectTask>();
+
+    private List<TaskProgress> _taskProgress = new List<TaskProgress>();
+    private List<TaskType> _taskTypes = new List<TaskType>();
+
+    private List<HoursPerDayModel> _workDays = new List<HoursPerDayModel>();
+    private List<HoursPerDayModel> _workDaysToShow = new List<HoursPerDayModel>();
+
+    private List<HoursPerTaskPerDayModel> _workPerTask = new List<HoursPerTaskPerDayModel>();
+    private List<HoursPerTaskPerDayModel> _workPerTaskToShow = new List<HoursPerTaskPerDayModel>();
+    private List<DateOnly> _daysToShow = new List<DateOnly>();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (_errorOccurred)
+            {
+                await localStorage.ClearAsync();
+
+                ToastService.Notify(new ToastMessage()
+                    {
+                        Type = ToastType.Danger,
+                        Message = "Error inesperado al realizar la acción",
+                        Title = "Error"
+                    });
+
+                navigationManager.NavigateTo("/");
+            }
+            else
+            {
+                if (!_authService.IsLoggedIn)
+                {
+                    navigationManager.NavigateTo("/");
+                }
+                else
+                {
+                    var uri = navigationManager.Uri;
+                    await localStorage.SetItemAsync("lastUrl", uri);
+                    await localStorage.SetItemAsync("huboRecarga", false);
+                }
+            }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            PreloadService.Show();
+            await GetGrid(_authService.User.Id, _authService.User.Id);
+            await GetCombo();
+            await base.OnInitializedAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorOccurred = true;
+        }
+        finally
+        {
+            PreloadService.Hide();
+        }
+    }
+
+    private async Task GetCombo()
+    {
+        _users = (await _userService.GetAsync()).Where(x => x.IsActive).ToList();
+
+        _users = _authService.User.ProfileId == (long)ProfileTypes.Administrador ?
+                    _users :
+                    _authService.User.ProfileId == (long)ProfileTypes.GestorProyectos ?
+                    GetUsersForProjectManager(_authService.User.Id, _users) :
+                    new List<User>();
+    }
+
+    private List<User> GetUsersForProjectManager(long loggedInUserId, List<User> allUsers)
+    {        
+        var directSubordinates = allUsers
+            .Where(x => x.Superior == loggedInUserId)
+            .ToList();
+
+        var loggedInUserTeams = allUsers
+            .FirstOrDefault(x => x.Id == loggedInUserId)?
+            .UserTeams
+            .Select(ut => ut.TeamId)
+            .Where(teamId => teamId != 2) 
+            .ToList();
+
+        var teamMembers = allUsers
+            .Where(x => x.UserTeams.Any(ut => loggedInUserTeams.Contains(ut.TeamId)))
+            .ToList();
+
+        return directSubordinates.Union(teamMembers).Distinct().ToList();
+    }
+
+    private async Task GetGrid(long userId, long newValue)
+    {
+        try
+        {
+            filterUser = newValue;
+
+            var pt = _projectTaskService.GetByUserIdAsync(newValue);
+            var wp = _projectTaskService.UserCalendarPerTask(newValue);
+            var wd = _projectTaskService.UserCalendar(newValue);
+
+            await Task.WhenAll(pt, wp);
+
+            _projectTask = await pt;
+            _workDays = await wd;
+            _workPerTask = await wp;
+
+            await CalculateTables();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+    }
+
+    private async Task CalculateTables()
+    {
+        _projectTaskToShow = _projectTask.Where(x =>
+            ((x.CreationDate.Month == filterDate.Month && x.CreationDate.Year == filterDate.Year) ||
+            (!x.Finished && DateOnly.FromDateTime(x.CreationDate) <= filterDate))).ToList();
+
+        _workPerTaskToShow = _workPerTask.Where(x => x.Date.Month == filterDate.Month && x.Date.Year == filterDate.Year).OrderBy(x => x.Date).ToList();
+
+        _workDaysToShow = _workDays.Where(x => x.Date.Month == filterDate.Month && x.Date.Year == filterDate.Year).ToList();
+        _daysToShow = _workDays.Select(x => x.Date).Where(x => x.Month == filterDate.Month && x.Year == filterDate.Year).Distinct().OrderBy(x => x).ToList();
+        
+        StateHasChanged();
+    }
+
+    private async Task OnFilterDateChanged(DateOnly date)
+    {
+        filterDate = date;
+
+        CalculateTables();
+        StateHasChanged();
+    }
+
+    private async Task OnFilterUserChanged()
+    {
+        try
+        {
+            _projectTask = await _projectTaskService.GetByUserIdAsync(filterUser);
+            _workDays = await _projectTaskService.UserCalendar(filterUser);
+            _workPerTask = await _projectTaskService.UserCalendarPerTask(filterUser);
+
+            CalculateTables();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+    }
+
+    private void ChangeDatePlus() => filterDate = filterDate.AddMonths(1);
+    private void ChangeDateLess() => filterDate = filterDate.AddMonths(-1);
+}

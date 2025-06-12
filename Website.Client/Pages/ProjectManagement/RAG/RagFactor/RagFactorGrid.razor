@@ -1,0 +1,359 @@
+﻿@using BlazorBootstrap
+
+@using DataContext
+@using DataService.Interfaces.Management;
+@using DataService.State;
+@using DataModel.Enums;
+@using DataService.Interfaces.ProjectManagement;
+
+@inherits RagFactor;
+
+@inject IRagFactorService _service
+
+@inject ChangedState changedState
+
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleContentAsync">Crear Factor de Evaluación</Button>
+    </div>
+</div>
+<Collapse @ref="collapseAgregar">
+    <Card>
+        <CardBody>
+            <div class="row">
+                <div class="col-4">
+                    Nombre
+                </div>
+                <div class="col-4">
+                    Descripción
+                </div>
+                <div class="col-4">
+                    Objetivo
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-4">
+                    <InputText Class="form-control" @bind-Value="@createFactor.Name"></InputText>
+                </div>
+                <div class="col-4">
+                    <InputTextArea Class="form-control" @bind-Value="@createFactor.Description" ></InputTextArea>
+                </div>
+                <div class="col-4">
+                    <InputTextArea Class="form-control" @bind-Value="@createFactor.Objetive"></InputTextArea>
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-8"></div>
+                <div class="col-4">
+                    <div class="row">
+                        <div class="col-6">
+                            <Button Class="btn btn-secondary form-control" onclick="@(() => CancelAdd())">
+                                Limpiar
+                            </Button>
+                        </div>
+                        <div class="col-6">
+                            <Button Class="btn btn-primary form-control" onclick="@(() => SaveAdd())">
+                                Crear
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </CardBody>
+    </Card>
+</Collapse>
+
+<br />
+<br />
+
+<Grid TItem="DataContext.RagFactor" @ref="grid" 
+      Data="_factor"
+      Class="table table-hover table-bordered table-striped"
+      AllowSorting="true"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="8"
+      Responsive="true">
+
+    <GridColumn TItem="DataContext.RagFactor" HeaderText="Nombre" FilterOperator="FilterOperator.Contains">
+        @context.Name
+    </GridColumn>
+
+    <GridColumn TItem="DataContext.RagFactor" HeaderText="Descripción" PropertyName="Description" FilterOperator="FilterOperator.Contains">
+        @context.Description
+    </GridColumn>
+
+    <GridColumn TItem="DataContext.RagFactor" HeaderText="Objetivo" PropertyName="Objetive" FilterOperator="FilterOperator.Contains">
+        @context.Objetive
+    </GridColumn> 
+
+    <GridColumn TItem="DataContext.RagFactor" HeaderText="Activo" FilterOperator="FilterOperator.Equals">
+        @if (context.Active)
+        {
+            <span class="oi oi-circle-check" aria-hidden="true" style="color: var(--l-green)"></span>
+        }
+        else
+        {
+            <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-red)"></span>
+        }
+    </GridColumn> 
+
+
+    <GridColumn TItem="DataContext.RagFactor" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="row">
+            <div class="col-12 d-flex">
+                <Button @onclick="async () => await OnShowModalClick(context)">
+                    <span class="oi oi-pencil" aria-hidden="true" title="Editar"></span>
+                </Button>
+
+                @if (context.Active)
+                {
+                    <Button @onclick="async () => await SaveDelete(context.Id)">
+                        <span class="oi oi-circle-x" aria-hidden="true" title="Eliminar" style="color: var(--l-red)"></span>
+                    </Button>
+                }
+                else
+                {
+                    <Button @onclick="async () => await  SaveDefinitiveDelete(context.Id)">
+                        <span class="oi oi-trash" aria-hidden="true" title="Eliminar" style="color: var(--l-yellow)"></span>
+                    </Button>
+                }
+            </div>
+        </div>
+    </GridColumn>
+
+</Grid>
+<Modal @ref="modal" Title="Notificación" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h4><b>@editFactor.Name</b></h4>
+            </div>
+        </div>
+        <div class="row" style="margin-top: 25px">
+            <div class="col-9">
+                Nombre
+            </div>
+            <div class="col-3">
+                Activo
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-9">
+                <InputText Class="form-control" @bind-Value="@editFactor.Name"></InputText>
+            </div>
+            
+            <div class="col-3">
+                <InputSelect class="form-select" @bind-Value="editFactor.Active">
+                    <option value=false>No</option>
+                    <option value=true>Si</option>
+                </InputSelect>
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-12">
+                Descripcion
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-12">
+                <InputTextArea Class="form-control" @bind-Value="@editFactor.Description"></InputTextArea>
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-12">
+                Objetivo
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-12">
+                <InputTextArea Class="form-control" @bind-Value="@editFactor.Objetive"></InputTextArea>
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Cerrar</Button>
+        </div>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="SaveEdit">Guardar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+
+
+@code {
+    private Collapse collapseAgregar;
+    private Grid<DataContext.RagFactor> grid;
+    [Inject] private ToastService ToastService { get; set; }
+
+    private Modal modal;
+
+
+    private DataContext.RagFactor editFactor { get; set; } = new DataContext.RagFactor();
+    private DataContext.RagFactor createFactor { get; set; } = new DataContext.RagFactor();
+   
+    private List<DataContext.RagFactor> _factor = new List<DataContext.RagFactor>();
+   
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetGrid();
+        await base.OnInitializedAsync();
+    }
+
+    private async Task GetGrid()
+    {
+        try
+        {
+            _factor = await _service.GetAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+    }
+
+    private async Task SaveAdd()
+    {
+        try
+        {
+            createFactor.Active = true;
+            await _service.AddAsync(createFactor);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            await OnHideModalClick();
+
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Success,
+                Message = "Acción realizada con exito",
+                Title = "Agregar Perfil"
+            });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+    }
+
+    private void CancelAdd()
+    {
+        createFactor.Name = "";
+        createFactor.Description = "";
+    }
+
+    private async Task SaveEdit()
+    {
+        try
+        {
+            await _service.EditAsync(editFactor);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            await OnHideModalClick();
+            CancelAdd();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con exito",
+                    Title = "Modificar Factor"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+    }
+
+    private async Task SaveDelete(long Id)
+    {
+        try
+        {
+            await _service.DeleteAsync(Id);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            await OnHideModalClick();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con éxito.",
+                    Title = "Eliminar Factor"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+    }
+    private async Task SaveDefinitiveDelete(long Id)
+    {
+        try
+        {
+            await _service.DefinitiveDeleteAsync(Id);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            
+           
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Eliminar Factor"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+    private async Task OnShowModalClick(DataContext.RagFactor factor)
+    {
+        editFactor = factor;
+
+        await modal?.ShowAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        editFactor = new DataContext.RagFactor();
+
+        await modal?.HideAsync();
+    }
+
+    private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
+}

@@ -1,0 +1,516 @@
+﻿@using BlazorBootstrap
+@using DataContext;
+@using DataModel.Enums;
+@using DataService.Auth;
+@using DataService.Interfaces.Management;
+@using DataService.State;
+
+@inherits Profiles
+
+@inject IProfileService _service
+@inject ISectionService _sectionService
+
+@inject AuthService authService
+@inject ChangedState changedState
+
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleContentAsync">Crear Perfíl</Button>
+    </div>
+</div>
+<Collapse @ref="collapseAgregar">
+    <Card>
+        <CardBody>
+            <div class="row">
+                <div class="col-4">
+                    Nombre
+                </div>
+                <div class="col-4">
+                    Descripción
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-4">
+                    <InputText Class="form-control" @bind-Value="@createProfile.Name"></InputText>
+                </div>
+                <div class="col-4">
+                    <InputText Class="form-control" @bind-Value="@createProfile.Description"></InputText>
+                </div>
+                <div class="col-4">
+                    <div class="row">
+                        <div class="col-6">
+                            <Button Class="btn btn-secondary form-control" onclick="@(() => CancelAdd())">
+                                Limpiar
+                            </Button>
+                        </div>
+                        <div class="col-6">
+                            <Button Class="btn btn-primary form-control" onclick="@(() => SaveAdd())">
+                                Crear
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </CardBody>
+    </Card>
+</Collapse>
+
+<br />
+<br />
+
+<Grid TItem="Profile" @ref="grid"
+      Data="_profiles"
+      Class="table table-hover table-bordered table-striped"
+      AllowSorting="true"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="8"
+      Responsive="true">
+
+    <GridColumn TItem="Profile" HeaderText="Nombre" SortKeySelector="item => item.Name" PropertyName="Name" FilterOperator="FilterOperator.Contains">
+        @context.Name
+    </GridColumn>
+
+    <GridColumn TItem="Profile" HeaderText="Descripción" SortKeySelector="item => item.Description" PropertyName="Description" FilterOperator="FilterOperator.Contains">
+        @context.Description
+    </GridColumn>
+
+    <GridColumn TItem="Profile" HeaderText="Activo" SortKeySelector="item => item.Active" PropertyName="Active" FilterOperator="FilterOperator.Equals">
+        @if (context.Active)
+        {
+            <span class="oi oi-circle-check" aria-hidden="true" style="color: var(--l-green)"></span>
+        }
+        else
+        {
+            <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-red)"></span>
+        }
+    </GridColumn>
+
+    <GridColumn TItem="Profile" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="row">
+            <div class="col-12 d-flex">
+                <Button @onclick="async () => await OnShowModalClick(context)">
+                    <span class="oi oi-pencil" aria-hidden="true" title="Editar"></span>
+                </Button>
+
+                @if (authService.User.Permissions.Contains((long)SectionsEnum.Administrar))
+                {
+                    <Button @onclick="async () => await OnShowModalPermissionClick(context)">
+                        <span class="oi oi-shield" aria-hidden="true" title="Permisos"></span>
+                    </Button>
+                }
+
+                <Button @onclick="async () => await SaveDelete(context.Id)">
+                    <span class="oi oi-circle-x" aria-hidden="true" title="Eliminar" style="color: var(--l-red)"></span>
+                </Button>
+            </div>
+        </div>
+    </GridColumn>
+</Grid>
+
+<Modal @ref="modal" Title="Notificación" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h4><b>@editProfile.Name</b></h4>
+            </div>
+        </div>
+        <div class="row" style="margin-top: 25px">
+            <div class="col-3">
+                Nombre
+            </div>
+            <div class="col-6">
+                Descripcion
+            </div>
+            <div class="col-3">
+                Activo
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-3">
+                <InputText Class="form-control" @bind-Value="@editProfile.Name"></InputText>
+            </div>
+            <div class="col-6">
+                <InputText Class="form-control" @bind-Value="@editProfile.Description"></InputText>
+            </div>
+            <div class="col-3">
+                <InputSelect class="form-select" @bind-Value="editProfile.Active">
+                    <option value=false>No</option>
+                    <option value=true>Si</option>
+                </InputSelect>
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Cerrar</Button>
+        </div>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="SaveEdit">Guardar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+<Modal @ref="modalPermission" Title="Permisos de Perfiles" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div>
+            <h5>Configurar Permisos De Perfiles</h5>
+            <div class="form-group">
+                <label for="section">Seleccionar sección:</label>
+                <div class="col-6">
+                    <InputSelect class="form-select" @bind-Value="createProfilePermission.SectionId">
+                        <option selected value="-1" disabled>Seleccione</option>
+                        @foreach (var p in _sections.Where(s => !_profilePermissions.Any(cp => cp.SectionId == s.Id)))
+                        {
+                            <option value="@p.Id">@p.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+            </div>
+        </div>
+
+        <div class="row pt-4">
+            <div class="col-6" style="margin-top: 20px">
+                <h5>Secciones asignadas:</h5>
+            </div>
+        </div>
+
+        <div class="row pt-2">
+            <div class="col-12">
+                @if (_filteredProfilePermissions != null && _filteredProfilePermissions.Any())
+                {
+                    @foreach (var p in _filteredProfilePermissions)
+                    {
+                        <div class="row pt-1">
+                            <div class="col-8 d-flex align-items-center">
+                                @p.Section.Name
+                            </div>
+
+                            <div class="col-2 d-flex align-items-center">
+                                <Button Class="btn form-control ms-2" Color="ButtonColor.Primary" @onclick="@(() => DeleteProfilePermission(p.Id))">
+                                    <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-white)"></span>
+                                </Button>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="row">
+                        <div class="col-12 d-flex align-items-center">
+                            No se encontraron permisos personalizados.
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn btn-primary form-control" @onclick="SaveProfilePermission">Guardar</Button>
+        </div>
+        <div class="col-3">
+            <Button Class="btn btn-secondary form-control" @onclick="OnHideModalPermissionClick">Cerrar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+@code {
+    private Collapse collapseAgregar;
+    private Grid<Profile> grid;
+    [Inject] private ToastService ToastService { get; set; }
+
+    private Modal modal;
+    private Modal modalPermission;
+    private long currentProfileId;
+
+    private Profile editProfile { get; set; } = new Profile();
+    private Profile createProfile { get; set; } = new Profile();
+    private ProfilePermission selectedProfilePermission { get; set; } = new ProfilePermission();
+    private ProfilePermission createProfilePermission { get; set; } = new ProfilePermission();
+
+
+    private List<Profile> _profiles = new List<Profile>();
+    private List<Section> _sections = new List<Section>();
+    private List<ProfilePermission> _profilePermissions = new List<ProfilePermission>();
+    private List<ProfilePermission> _filteredProfilePermissions = new List<ProfilePermission>();
+
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetGrid();
+        await base.OnInitializedAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await GetCombo();
+    }
+
+    private async Task GetGrid()
+    {
+        try
+        {
+            _profiles = await _service.GetAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+    }
+
+    private async Task GetCombo()
+    {
+        try
+        {
+            _profiles = (await _service.GetAsync()).Where(x => x.Active).ToList();
+            _sections = await _sectionService.GetAsync();
+            _profilePermissions = (await _sectionService.GetProfilePermissionAsync()).Where(x => x.ProfileId == currentProfileId).ToList();
+
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveAdd()
+    {
+        try
+        {
+            createProfile.Active = true;
+            await _service.AddAsync(createProfile);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            await OnHideModalClick();
+
+            createProfile = new Profile();
+
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Success,
+                Message = "Acción realizada con exito",
+                Title = "Agregar Perfil"
+            });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+    }
+
+    private async Task SaveProfilePermission()
+    {
+        createProfilePermission.ProfileId = currentProfileId;
+
+        try
+        {
+            await _sectionService.AddProfilePermissionAsync(createProfilePermission);
+
+            _profilePermissions = (await _sectionService.GetProfilePermissionAsync()).Where(x => x.ProfileId == currentProfileId).ToList();
+
+            _filteredProfilePermissions = _profilePermissions;
+
+            createProfilePermission = new ProfilePermission(); 
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+
+            changedState.InitChanges();
+
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Asignar Permiso"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private void CancelAdd()
+    {
+        createProfile.Name = "";
+        createProfile.Description = "";
+    }
+
+    private async Task SaveEdit()
+    {
+        try
+        {
+            await _service.EditAsync(editProfile);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            CancelAdd();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con exito",
+                    Title = "Modificar Perfil"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+    }
+
+    private async Task SaveDelete(long Id)
+    {
+        try
+        {
+            await _service.DeleteAsync(Id);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            await OnHideModalClick();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con exito",
+                    Title = "Eliminar Perfil"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+    }
+
+    private async Task DeleteProfilePermission(long permissionId)
+    {
+        try
+        {
+            await _sectionService.DeleteProfilePermissionAsync(permissionId);
+
+            _filteredProfilePermissions = _filteredProfilePermissions.Where(x => x.Id != permissionId).ToList();
+
+            _profilePermissions = (await _sectionService.GetProfilePermissionAsync()).Where(x => x.ProfileId == currentProfileId).ToList();
+
+            _filteredProfilePermissions = _profilePermissions;
+
+            await grid.RefreshDataAsync();
+            await GetGrid();
+
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Contrato eliminado con éxito.",
+                    Title = "Eliminar Contrato"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task OnShowModalClick(Profile profile)
+    {
+        editProfile = profile;
+
+        await modal.ShowAsync();
+    }
+
+    private async Task OnShowModalPermissionClick(Profile profile)
+    {
+        currentProfileId = profile.Id;
+
+        _profilePermissions = (await _sectionService.GetProfilePermissionAsync()).Where(x => x.ProfileId == currentProfileId).ToList();
+
+        _filteredProfilePermissions = _profilePermissions;
+
+        selectedProfilePermission = new ProfilePermission
+            {
+                Id = profile.Id,
+
+            };
+
+
+        await modalPermission.ShowAsync();
+    }
+
+    private async Task OnHideModalPermissionClick()
+    {
+        await modalPermission.HideAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        editProfile.Id = 0;
+        editProfile.Name = "";
+        editProfile.Description = "";
+        editProfile.Active = false;
+
+        await modal.HideAsync();
+    }
+
+    private void FilterProfilePermissions(long profileId)
+    {
+        _filteredProfilePermissions = _profilePermissions
+            .Where(s => s.ProfileId == profileId)
+            .ToList();
+
+        StateHasChanged();
+    }
+
+    protected override void OnInitialized()
+    {
+        
+        createProfilePermission.SectionId = -1;
+
+    }
+
+    private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
+
+
+}

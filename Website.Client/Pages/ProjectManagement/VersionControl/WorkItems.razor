@@ -1,0 +1,351 @@
+﻿@page "/workitems"
+@using DataContext
+@using DataModel.Response.VersionControl;
+@using DataService.Auth;
+@using DataService.Interfaces.Management;
+@using DataService.Interfaces.VersionControl;
+@using Website.Client.Components.Modal;
+@using BlazorBootstrap
+
+@inject IVersionControlService Connection
+@inject IUserService userService
+@inject AuthService authService
+@inject NavigationManager navigationManager
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+<PageTitle>Clouseau - Work Items</PageTitle>
+
+<h3>Analizador Work Items</h3>
+
+<br />
+
+@if (_allCommits.Count > 0)
+{
+    <div class="row">
+        <div class="col-12 d-flex justify-content-end">
+            <Switch Value="showDuplicates" Label="Mostrar Duplicados" ValueExpression="() => showDuplicates" ValueChanged="ShowDuplicates" />
+        </div>
+    </div>
+
+    <br />
+
+    <Grid @ref="grid" TItem="VersionControlCommitModel"
+          Class="table table-hover table-bordered table-striped"
+          Data="_allCommits"
+          AllowSorting="true"
+          AllowFiltering="true"
+          AllowPaging="true"
+          PageSize="8"
+          Responsive="true">
+
+        <GridColumn TItem="VersionControlCommitModel" HeaderText="Estado" Sortable="false" Filterable="false" TextNoWrap="true">
+            @{
+                var daysSinceLastCommit = (DateTime.Now - context.Date).Days;
+                var nonworkingDays = _users.FirstOrDefault(u => u.Username == context.UserSWF)?.UserNonworkingDays;
+
+                if (nonworkingDays != null && nonworkingDays.Count() > 0)
+                {
+                    foreach (var nonworkingDay in nonworkingDays)
+                    {
+                        if (context.Date >= nonworkingDay.DateFrom && context.Date <= nonworkingDay.DateTo)
+                        {
+                            daysSinceLastCommit = 0;
+                            break;
+                        }
+                    }
+                }
+
+                string statusColor;
+                string moodFace;
+
+                if (daysSinceLastCommit > 15)
+                {
+                    statusColor = "var(--l-red)";
+                    moodFace = "sentiment_very_dissatisfied";
+                }
+                else if (daysSinceLastCommit > 10)
+                {
+                    statusColor = "var(--l-orange)";
+                    moodFace = "sentiment_dissatisfied";
+                }
+                else if (daysSinceLastCommit > 5)
+                {
+                    statusColor = "var(--l-yellow)";
+                    moodFace = "sentiment_neutral";
+                }
+                else if (daysSinceLastCommit > 0)
+                {
+                    statusColor = "var(--l-lemon)";
+                    moodFace = "sentiment_satisfied";
+                }
+                else
+                {
+                    statusColor = "var(--l-green)";
+                    moodFace = "sentiment_very_satisfied";
+                }
+
+                <div style="margin: auto; text-align: center; vertical-align: middle; display: flex; align-items: center; justify-content: center">
+                    <i class="material-icons" style="font-size:25px; margin: 0; color: @statusColor">@moodFace</i>
+                </div>
+            }
+        </GridColumn>
+
+        <GridColumn TItem="VersionControlCommitModel" HeaderText="Usuario" SortKeySelector="item => item.Committer" PropertyName="Committer" FilterOperator="FilterOperator.Contains" TextNoWrap="true">
+            @(string.IsNullOrEmpty(context.UserSWF) ? context.Committer : context.UserSWF)
+        </GridColumn>
+
+        <GridColumn TItem="VersionControlCommitModel" HeaderText="CECO" SortKeySelector="item => item.Project" PropertyName="Project" FilterOperator="FilterOperator.Contains" TextNoWrap="true">
+            @context.Project
+        </GridColumn>
+
+        <GridColumn TItem="VersionControlCommitModel" HeaderText="Repositorio" SortKeySelector="item => item.Repository" PropertyName="Repository" FilterOperator="FilterOperator.Contains" TextNoWrap="true">
+            @context.Repository
+        </GridColumn>
+
+        <GridColumn TItem="VersionControlCommitModel" HeaderText="Rama" SortKeySelector="item => item.Branch" PropertyName="Branch" Filterable="false" TextNoWrap="true">
+            @context.Branch
+        </GridColumn>
+
+        <GridColumn TItem="VersionControlCommitModel" HeaderText="Comentario" Sortable="false" Filterable="false" TextAlignment="Alignment.Center" TextNoWrap="true">
+            <div class="tooltip-container">
+                <div class="row">
+                    <div class="col-12 d-flex align-items-center justify-content-center tooltip-text">
+                        <span>
+                            @context.Comment
+                        </span>
+                    </div>
+                </div>
+                <span class="oi oi-info" aria-hidden="true"></span>
+            </div>
+        </GridColumn>
+
+        <GridColumn TItem="VersionControlCommitModel" HeaderText="Cambios" Sortable="false" Filterable="false" TextNoWrap="true">
+            @context.ChangeCount
+        </GridColumn>
+
+        <GridColumn TItem="VersionControlCommitModel" HeaderText="Ultimo Commit" SortKeySelector="item => item.Date" PropertyName="Date" FilterOperator="FilterOperator.Equals" TextNoWrap="true">
+            @context.Date
+        </GridColumn>
+
+        <GridColumn TItem="VersionControlCommitModel" HeaderText="Acciones" Sortable="false" Filterable="false" TextNoWrap="true">
+            <div class="row">
+                <div class="col-12 d-flex">
+                    <Button @onclick="() =>
+                        {
+                        ModalDialog.Open();
+                        usuarioModal = context.Committer;
+                        commitsModal = new List<VersionControlCommitModel>();
+                        commitsModal = GetCommitsByCommiter(context.Committer);
+                        }">
+                        <span class="oi oi-chat" aria-hidden="true" title="Editar"></span>
+                    </Button>
+                </div>
+            </div>
+        </GridColumn>
+    </Grid>
+
+    <CustomModalDialog @ref="@ModalDialog" Title="Historial de Commits">
+        <div class="row">
+            <div class="col-12">
+                <h5>@usuarioModal</h5>
+                <hr>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-12" style="overflow: auto; margin-bottom: 10px">
+                @if (commitsModal.Count == 0)
+                {
+                    <p><em>Cargando...</em></p>
+                }
+                else
+                {
+                    foreach (var c in commitsModal)
+                    {
+                        <div class="row history-container">
+                            <div class="col-12">
+                                <div class="row" style="margin-top: 10px">
+                                    <div class="col-8 d-flex align-items-center">
+                                        <b>@c.Project</b>&nbsp;/&nbsp;<b>@c.Repository</b>&nbsp;/&nbsp;<b>@c.Branch</b>
+                                    </div>
+                                    <div class="col-4 d-flex align-items-center justify-content-end">
+                                        @c.Date
+                                    </div>
+                                </div>
+                                <hr>
+                                <div class="row" style="margin-top: 10px; margin-bottom: 10px">
+                                    <div class="col-10">
+                                        @c.Comment
+                                    </div>
+                                    <div class="col-2 d-flex align-items-center justify-content-end">
+                                        @c.ChangeCount
+                                        @if (c.ChangeCount == 1)
+                                        {
+                                            <span style="margin: 0; padding: 0">&nbsp;Cambio</span>
+                                        }
+                                        else
+                                        {
+                                            <span>&nbsp;Cambios</span>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+        <hr>
+        <div class="row">
+            <div class="col-8">
+            </div>
+            <div class="col-4">
+                <button class="btn btn-secondary form-control" @onclick="() => ModalDialog.Close()">Close</button>
+            </div>
+        </div>
+    </CustomModalDialog>
+
+    <script suppress-error="BL9992">
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl)
+        })
+
+        $(function () {
+            $('[data-toggle="tooltip"]').tooltip()
+        })
+    </script>
+}
+
+@code {
+    private CustomModalDialog ModalDialog { get; set; } = new CustomModalDialog();
+    private Grid<VersionControlCommitModel> grid;
+    [Inject] protected PreloadService PreloadService { get; set; }
+    [Inject] ToastService ToastService { get; set; }
+
+    private bool showDuplicates;
+
+    private List<VersionControlProjectModel> _projects = new List<VersionControlProjectModel>();
+    private List<VersionControlCommitModel> _allCommits = new List<VersionControlCommitModel>();
+    private List<VersionControlCommitModel> _allCommitsToShow = new List<VersionControlCommitModel>();
+    private List<VersionControlCommitModel> _commits = new List<VersionControlCommitModel>();
+    private List<User> _users = new List<User>();
+
+    private DateTime fechaDesde = DateTime.Now;
+    private DateTime fechaHasta = DateTime.Now;
+
+    private string usuarioModal = string.Empty;
+    private List<VersionControlCommitModel> commitsModal = new List<VersionControlCommitModel>();
+
+    private bool _errorOccurred = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (_errorOccurred)
+            {
+                await localStorage.ClearAsync();
+
+                ToastService.Notify(new ToastMessage()
+                    {
+                        Type = ToastType.Danger,
+                        Message = "Error inesperado al realizar la acción",
+                        Title = "Error"
+                    });
+
+                navigationManager.NavigateTo("/");
+
+            }
+            else
+            {
+                if (!authService.IsLoggedIn)
+                {
+                    navigationManager.NavigateTo("/");
+                }
+                else
+                {
+                    var uri = navigationManager.Uri;
+                    await localStorage.SetItemAsync("lastUrl", uri);
+                    await localStorage.SetItemAsync("huboRecarga", false);
+                }
+            }
+
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            PreloadService.Show();
+
+            var workItems = await Connection.GetWorkItemsAsync();
+
+            await LoadTable();
+        }
+        catch (Exception ex)
+        {
+            _errorOccurred = true;
+        }
+        finally
+        {
+            PreloadService.Hide();
+        }
+    }
+
+    protected async Task ShowDuplicates(bool value)
+    {
+        showDuplicates = value;
+        await LoadTable();
+        await grid.RefreshDataAsync();
+
+    }
+
+    private async Task LoadTable()
+    {
+        var workItems = await Connection.GetWorkItemsAsync();
+
+
+        _allCommits = new List<VersionControlCommitModel>();
+
+        _allCommits = _projects.SelectMany(p => p.Repositories)
+            .SelectMany(r => r.Commits)
+            .GroupBy(c => new { Commiter = c.Committer })
+            .Select(g => g.OrderByDescending(c => c.Date).First())
+            .OrderByDescending(o => o.Date)
+            .ThenBy(t => t.Committer)
+            .ToList();
+
+        if (!showDuplicates)
+        {
+            var commitsWithUserSWF = _allCommits.Where(c => !string.IsNullOrEmpty(c.UserSWF))
+                .GroupBy(c => c.UserSWF)
+                .Select(g => g.OrderByDescending(c => c.Date).First())
+                .ToList();
+
+            var commitsWithoutUserSWF = _allCommits.Where(c => string.IsNullOrEmpty(c.UserSWF))
+                .ToList();
+
+            _allCommits = commitsWithUserSWF.Concat(commitsWithoutUserSWF)
+                .OrderByDescending(o => o.Date)
+                .ThenBy(t => t.Committer)
+                .ToList();
+        }
+    }
+
+    protected List<VersionControlCommitModel> GetCommitsByCommiter(string commiter)
+    {
+        _commits = new List<VersionControlCommitModel>();
+
+        var latestCommitsByCommiter = _projects.SelectMany(p => p.Repositories)
+                         .SelectMany(r => r.Commits)
+                         .GroupBy(c => new { Guid = c.Guid }).Select(x => x.First())
+                         .Where(x => x.Committer == commiter)
+                         .OrderByDescending(x => x.Date)
+                         .ToList();
+
+        _commits = latestCommitsByCommiter;
+
+        return _commits;
+    }
+}

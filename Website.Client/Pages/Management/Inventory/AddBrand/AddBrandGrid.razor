@@ -1,0 +1,250 @@
+﻿@using BlazorBootstrap;
+@using DataContext;
+@using DataModel.Enums;
+@using DataService.Auth;
+@using DataService.Interfaces.Management;
+@using DataService.State;
+@using System.Globalization;
+@using System.Text.RegularExpressions;
+
+@inherits AddBrand
+
+@inject IJSRuntime JSRuntime
+@inject IAddBrandService _AddBrandService
+
+@inject AuthService _authService
+
+@inject NavigationManager uriHelper;
+
+@inject ChangedState changedState
+
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleContentAsync">Crear Nueva Marca</Button>
+    </div>
+</div>
+<Collapse @ref="collapseAgregar" Class="custom-container">
+    <Card>
+        <CardBody>
+            <div class="row">
+                <div class="col-6">
+                   Marca
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-6">
+                    <InputText class="form-control" @bind-Value="addBrand.Name"></InputText>
+                </div>
+                <div class="col-3">
+                    <Button class="btn form-control" Color="ButtonColor.Secondary" onclick="@(() => CancelAdd())">
+                        Limpiar
+                    </Button>
+                </div>
+                <div class="col-3">
+                    <Button class="btn form-control" Color="ButtonColor.Primary" onclick="@(() => SaveAdd())">
+                        Crear
+                    </Button>
+                </div>
+            </div>
+        </CardBody>
+    </Card>
+</Collapse>
+
+<br />
+<br />
+
+<Grid TItem="DataContext.InventoryBrand" @ref="grid"
+      Data="_Brands"
+      Class="table table-hover table-bordered table-striped text-nowrap"
+      AllowSorting="true"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="8"
+      Responsive="true"
+      Unit="Unit.Px">
+
+    <GridColumn TItem="DataContext.InventoryBrand" HeaderText="Marcas Agregadas" SortKeySelector="item => item.Name" PropertyName="Name" FilterOperator="FilterOperator.Contains">
+        @context.Name 
+    </GridColumn>
+
+
+    <GridColumn TItem="DataContext.InventoryBrand" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="row">
+            <div class="col-12 d-flex">                
+                <Button @onclick="async () => await SaveDefinitiveDelete(context.Id)">
+                    <span class="oi oi-trash" aria-hidden="true" title="Eliminar"></span>
+                </Button>
+            </div>
+        </div>
+    </GridColumn>
+</Grid>
+
+<ConfirmDialog @ref="dialog" />
+
+<Modal @ref="modalSuperLupa" Title="Detalles del Equipo" Size="ModalSize.Large">
+    <BodyTemplate>
+        
+        <div class="row">
+            <div class="col-12">
+                <h4> <b>@modalSuperLupa</b> </h4>
+                <div style="display: none">                    
+                </div>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-12">
+                
+            </div>
+        </div> 
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Cerrar</Button>
+        </div>
+
+    </FooterTemplate>
+</Modal>
+
+@code
+{
+    [Inject] ToastService ToastService { get; set; }
+    private ConfirmDialog dialog;
+    private Collapse collapseAgregar;
+    private Grid<DataContext.InventoryBrand> grid;
+
+    private Modal modalSuperLupa;
+
+    public long modalTaskId { get; set; }
+
+    private DataContext.Inventory addInventory { get; set; } = new DataContext.Inventory();
+    private DataContext.Inventory editInventory { get; set; } = default!;
+
+    private DataContext.InventoryBrand addBrand { get; set; } = new InventoryBrand();   
+    private DataContext.InventoryBrand editBrand { get; set; } = new InventoryBrand(); 
+
+    private List<DataContext.Inventory> _Inventory = new List<DataContext.Inventory>();
+    private List<DataContext.InventoryBrand> _Brands = new List<DataContext.InventoryBrand>();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await GetCombos();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetGrid();
+        await GetCombos();
+        await base.OnInitializedAsync();
+    }
+
+    private async Task GetCombos()
+    {
+        try
+        {
+            _Brands = await _AddBrandService.GetBrands();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task GetGrid()
+    {
+        try
+        {
+            _Brands = (await _AddBrandService.GetAsync()).OrderBy(x => x.Name).ToList();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveAdd()  
+    {
+        try
+        {
+            await _AddBrandService.AddAsync(addBrand);    
+            addBrand = new DataContext.InventoryBrand();
+            StateHasChanged();
+            changedState.InitChanges();
+            await GetGrid();
+            
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con exito",
+                    Title = "Agregar Marca"
+                });
+        }
+
+
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private void CancelAdd()
+    {
+        addBrand.Name = "";
+    }
+
+
+    private async Task OnHideModalClick()
+    {
+
+        await modalSuperLupa?.HideAsync();
+    }
+
+    private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync(); 
+   
+
+    private async Task SaveDefinitiveDelete(long Id) 
+    {
+        try
+        {
+
+
+            await _AddBrandService.DefinitiveDeleteAsync(Id);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Eliminar Marca "
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error al borrar marca ",
+                    Title = "Error"
+                });
+        }
+    }
+}

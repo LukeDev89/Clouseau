@@ -1,0 +1,340 @@
+﻿@using BlazorBootstrap
+@using DataService.Interfaces.Management;
+@using DataService.State;
+@using DataContext
+
+@inherits LicenseTypes
+
+@inject ILicenseTypeService _service
+
+@inject ChangedState changedState
+
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleContentAsync">
+            Crear Tipo de Licencia
+        </Button>
+    </div>
+</div>
+<Collapse @ref="collapseAgregar">
+    <Card>
+        <CardBody>
+            <div class="row">
+                <div class="col-3">
+                    Nombre
+                </div>
+                <div class="col-9">
+                    Mensaje Informativo
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-3">
+                    <InputText Class="form-control" @bind-Value="@createLicenseType.Name"></InputText>
+                </div>
+                <div class="col-9">
+                    <InputText Class="form-control" @bind-Value="@createLicenseType.HelperMessage"></InputText>
+                </div>
+            </div>
+            <br />
+            <div class="row">
+                <div class="col-3">
+                    Requiere Documentación
+                </div>
+                <div class="col-3">
+                    Días Consecutivos Permitidos ( 0 = Sin Limite )
+                </div>
+                <div class="col-3">
+                    Días Máximos Permitidos ( 0 = Sin Limite )
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-3">
+                    <InputCheckbox @bind-Value="@createLicenseType.FileRequired"></InputCheckbox>
+                </div>
+                <div class="col-3">
+                    <InputNumber @bind-Value="@createLicenseType.ConsecutiveDays" Class="form-control"></InputNumber>
+                </div>
+                <div class="col-3">
+                    <InputNumber @bind-Value="@createLicenseType.MaxDaysPerYear" Class="form-control"></InputNumber>
+                </div>
+            </div>
+            <br />
+            <div class="row">
+                <div class="col-8">
+
+                </div>
+                <div class="col-4">
+                    <div class="row">
+                        <div class="col-6">
+                            <Button Class="btn btn-secondary form-control" onclick="@(() => CancelAdd())">
+                                Limpiar
+                            </Button>
+                        </div>
+                        <div class="col-6">
+                            <Button Class="btn btn-primary form-control" onclick="@(() => SaveAdd())">
+                                Crear
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </CardBody>
+    </Card>
+</Collapse>
+
+<br />
+<br />
+
+<Grid TItem="LicenseType" @ref="grid"
+      Class="table table-hover table-bordered table-striped"
+      Data="_licenses"
+      AllowSorting="true"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="8"
+      Responsive="true">
+
+    <GridColumn TItem="LicenseType" HeaderText="Nombre" SortKeySelector="item => item.Name" PropertyName="Name" FilterOperator="FilterOperator.Contains">
+        @context.Name
+    </GridColumn>
+
+    <GridColumn TItem="LicenseType" HeaderText="Requiere Documentación" SortKeySelector="item => item.FileRequired" PropertyName="FileRequired" FilterOperator="FilterOperator.Equals">
+        @if (context.FileRequired)
+        {
+            <span class="oi oi-circle-check" aria-hidden="true" style="color: var(--l-green)"></span>
+        }
+        else
+        {
+            <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-red)"></span>
+        }
+    </GridColumn>
+
+    <GridColumn TItem="LicenseType" HeaderText="Días Consecutivos" SortKeySelector="item => item.ConsecutiveDays" PropertyName="ConsecutiveDays" FilterOperator="FilterOperator.Equals">
+        @context.ConsecutiveDays
+    </GridColumn>
+
+    <GridColumn TItem="LicenseType" HeaderText="Días Máximos Por Año" SortKeySelector="item => item.MaxDaysPerYear" PropertyName="MaxDaysPerYear" FilterOperator="FilterOperator.Equals">
+        @context.MaxDaysPerYear
+    </GridColumn>
+
+    <GridColumn TItem="LicenseType" HeaderText="Mensaje Informativo" SortKeySelector="item => item.HelperMessage" PropertyName="HelperMessage" FilterOperator="FilterOperator.Contains">
+        @context.HelperMessage
+    </GridColumn>
+
+    <GridColumn TItem="LicenseType" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="row">
+            <div class="col-12 d-flex">
+                <Button @onclick="async () => await OnShowModalClick(context)">
+                    <span class="oi oi-pencil" aria-hidden="true" title="Editar"></span>
+                </Button>
+
+                <Button @onclick="async () => await SaveDelete(context.Id)">
+                    <span class="oi oi-circle-x" aria-hidden="true" title="Eliminar" style="color: var(--l-red)"></span>
+                </Button>
+            </div>
+        </div>
+    </GridColumn>
+</Grid>
+
+<Modal @ref="modal" Title="Notificación" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h4><b>@modalLicenseType.Name</b></h4>
+            </div>
+        </div>
+        <div class="row" style="margin-top: 25px">
+            <div class="col-3">
+                Nombre
+            </div>
+            <div class="col-9">
+                Mensaje Informativo
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-3">
+                <InputText Class="form-control" @bind-Value="@modalLicenseType.Name"></InputText>
+            </div>
+            <div class="col-9">
+                <InputText Class="form-control" @bind-Value="@modalLicenseType.HelperMessage"></InputText>
+            </div>
+        </div>
+        <br />
+        <div class="row">
+            <div class="col-3">
+                Requiere Documentación
+            </div>
+            <div class="col-3">
+                Días Consecutivos Permitidos ( 0 = Sin Limite )
+            </div>
+            <div class="col-3">
+                Días Máximos Permitidos ( 0 = Sin Limite )
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-3">
+                <InputCheckbox @bind-Value="@modalLicenseType.FileRequired"></InputCheckbox>
+            </div>
+            <div class="col-3">
+                <InputNumber @bind-Value="@modalLicenseType.ConsecutiveDays" Class="form-control"></InputNumber>
+            </div>
+            <div class="col-3">
+                <InputNumber @bind-Value="@modalLicenseType.MaxDaysPerYear" Class="form-control"></InputNumber>
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Cerrar</Button>
+        </div>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="SaveEdit">Guardar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+@code {
+    [Inject] ToastService ToastService { get; set; }
+    private Collapse collapseAgregar;
+    private Grid<LicenseType> grid;
+
+    private Modal modal;
+
+    private LicenseType createLicenseType = new LicenseType();
+    private LicenseType modalLicenseType = new LicenseType();
+
+    private List<LicenseType> _licenses = new List<LicenseType>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetGrid();
+        await base.OnInitializedAsync();
+    }
+
+    private async Task GetGrid()
+    {
+        try
+        {
+            _licenses = await _service.GetAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+    }
+
+    private async Task SaveAdd()
+    {
+        try
+        {
+            await _service.AddAsync(createLicenseType);
+            await GetGrid();
+            await grid.RefreshDataAsync();
+
+            changedState.InitChanges();
+
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Success,
+                Message = "Tipo de Licencia guardada con exito.",
+                    Title = "Tipo de Licencia Guardada"
+            });
+
+            CancelAdd();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+    }
+
+    private void CancelAdd()
+    {
+        createLicenseType = new LicenseType();
+    }
+
+    private async Task SaveEdit()
+    {
+        try
+        {
+            await _service.EditAsync(modalLicenseType);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            await OnHideModalClick();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Tipo de Licencia editada con exito.",
+                    Title = "Tipo de Licencia Editada"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+
+    }
+
+    private async Task SaveDelete(long Id)
+    {
+        try
+        {
+            await _service.DeleteAsync(Id);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            await OnHideModalClick();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Tipo de Licencia eliminada con exito.",
+                    Title = "Tipo de Licencia Eliminada"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+    }
+
+    private async Task OnShowModalClick(LicenseType license)
+    {
+        modalLicenseType = license;
+
+        await modal?.ShowAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        modalLicenseType = new LicenseType();
+
+        await modal?.HideAsync();
+    }
+
+    private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
+}

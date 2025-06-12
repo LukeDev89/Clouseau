@@ -1,0 +1,1 @@
+﻿ALTER TABLE [ClouseauDev].[dbo].[Roles] ADD hierarchy smallint NOT NULL DEFAULT (1);

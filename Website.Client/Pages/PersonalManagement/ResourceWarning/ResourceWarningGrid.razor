@@ -1,0 +1,575 @@
+﻿@using BlazorBootstrap
+@using DataContext
+@using DataModel.Enums
+@using DataService.Auth;
+@using DataService.Interfaces.Management;
+
+@using DataService.State;
+
+@inherits ResourceWarning
+
+@inject IResourceWarningService _resourceWarningService
+@inject IResourceWarningHistoryService _resourceWarningHistoryService
+@inject IUserService _userService
+@inject AuthService authService
+@inject ChangedState changedState
+@inject IJSRuntime JSRuntime
+
+<div class="row">
+	<div class="col-12">
+		<Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleContentAsync">
+			Crear Incidencia para RRHH
+		</Button>
+	</div>
+</div>
+<Collapse @ref="collapseAgregar">
+	<Card>
+
+		<CardBody>
+			<div class="row">
+				<div class="col-3">
+					<span class="text-nowrap">Colaborador Citado</span>
+				</div>
+			</div>
+			<div class="row mt-2">
+				<div class="col-3">
+					<InputSelect id="userSelect" class="form-select" @bind-Value="createResourceWarning.UserId">
+						<option value="-1" disabled="@(createResourceWarning.UserId != -1)">Seleccione</option>
+						@foreach (var p in _users.Where(u => u.IsActive).OrderBy(u => u.UserFullName))
+						{
+							<option value="@p.Id">@p.UserFullName</option>
+						}
+					</InputSelect>
+				</div>
+			</div>
+			<div class="row mt-2">
+				<div class="col-6">
+					<span class="text-nowrap">Observación</span>
+				</div>
+			</div>
+			<div class="row mt-2">
+				<div class="col-12">
+					<textarea class="form-control" @bind="createResourceWarning.Comment" rows="3"></textarea>
+				</div>
+			</div>
+			<div class="row mt-4">
+				<div class="col-6">
+				</div>
+				<div class="col-6">
+					<div class="row">
+						<div class="col-6"></div>
+						<div class="col-3">
+							<Button Class="btn btn-secondary form-control" onclick="@(() => CancelAdd())">
+								Limpiar
+							</Button>
+						</div>
+						<div class="col-3">
+							<Button Class="btn btn-primary form-control" onclick="@(() => SaveAdd())">
+								Crear
+							</Button>
+						</div>
+					</div>
+
+				</div>
+			</div>
+		</CardBody>
+	</Card>
+</Collapse>
+
+<br />
+<br />
+
+<Grid TItem="DataContext.ResourceWarning" @ref="grid"
+	  Data="_resourceWarnings"
+	  Class="table table-hover table-bordered table-striped"
+	  AllowSorting="true"
+	  AllowFiltering="true"
+	  AllowPaging="true"
+	  PageSize="10"
+	  Responsive="true">
+
+	<!-- Si mi perfil es distinto a rrhh entonces . . . -->
+	<!-- Solo tengo que ver solo los tickets que yo cree, no los que me crearon -->
+	<!-- Si mi perfil ES rrhh entonces VEO TODO ?? -->
+
+	<GridColumn TItem="DataContext.ResourceWarning" HeaderText="Anunciante"
+				SortKeySelector="item => item.Advertiser.UserFullName"
+				PropertyName="Advertiser"
+				FilterOperator="FilterOperator.Contains">
+		@context.Advertiser.UserFullName
+	</GridColumn>
+
+	<GridColumn TItem="DataContext.ResourceWarning" HeaderText="Colaborador Citado"
+				SortKeySelector="item => item.User.UserFullName"
+				PropertyName="User.UserFullName"
+				FilterOperator="FilterOperator.Contains">
+		@context.User.UserFullName
+	</GridColumn>
+
+	@* 	<GridColumn TItem="DataContext.ResourceWarning" HeaderText="Descripción del Suceso"
+	SortKeySelector="item => item.Comment"
+	PropertyName="Comment"
+	FilterOperator="FilterOperator.Contains"
+	Style="white-space: normal; overflow-wrap: break-word; max-width: 300px; min-height: 50px;">
+	@context.Comment
+	</GridColumn>  *@
+
+	<GridColumn TItem="DataContext.ResourceWarning" HeaderText="Fecha"
+				SortKeySelector="item => item._Date"
+				PropertyName="_Date"
+				FilterOperator="FilterOperator.Equals">
+		@context.Date.ToString("dd/MM/yyyy")
+	</GridColumn>
+
+	<GridColumn TItem="DataContext.ResourceWarning" HeaderText="Estado" SortKeySelector="item => item.State" PropertyName="State" FilterOperator="FilterOperator.Contains" Class="text-center">
+		@if (context.State == (short)ResourceWarningState.Pendiente)
+		{
+			<span class="badge bg-danger" style="color: white; margin-top: 10px; margin-bottom: 10px; padding: 10px 20px; min-width: 100px; display: inline-block; text-align: center;">
+				Pendiente
+			</span>
+		}
+
+		@* 		else if (context.State == (short)ResourceWarningState.Visto)
+		{
+		<span class="badge bg-warning" style="color: white; margin-top: 10px; margin-bottom: 10px; padding: 10px 20px; min-width: 100px; display: inline-block; text-align: center;">
+		Visto
+		</span>
+		} *@
+
+		else if (context.State == (short)ResourceWarningState.Resuelto)
+		{
+			<span class="badge bg-success" style=" color: white; margin-top: 10px; margin-bottom: 10px; padding: 10px 20px; min-width: 100px; display: inline-block; text-align: center;">
+				Resuelto
+			</span>
+		}
+	</GridColumn>
+
+	<GridColumn TItem="DataContext.ResourceWarning" HeaderText="Acciones" Sortable="false" Filterable="false">
+		<div class="text-center">
+			<div class="d-inline-flex">
+
+				<Button @onclick="async () => await OnShowModalClick(context)">
+					<span class="oi oi-eye" aria-hidden="true" title="Revisión de Estado"></span>
+				</Button>
+
+				<Button @onclick="async () => await OnShowModalHistoryClick(context)">
+					<span class="oi oi-comment-square" aria-hidden="true" title="Comentarios"></span>
+				</Button>
+
+				<Button @onclick="async () => await SaveDefinitiveDelete(context.Id)">
+					<span class="oi oi-trash" aria-hidden="true" title="Eliminar"></span>
+				</Button>
+
+			</div>
+		</div>
+	</GridColumn>
+</Grid>
+
+
+<Modal @ref="modal" Title="Revisión de Estado" Size="ModalSize.Large">
+	<BodyTemplate>
+		<div class="row">
+			<div class="col-12">
+				<div style="display: none">
+					@editResourceWarning.Id
+				</div>
+			</div>
+		</div>
+
+		<div class="row align-items-center">
+			<div class="col-2 text-center">
+				Colaborador Citado
+			</div>
+			<div class="col-10">
+				<span class="form-control" style="background-color: #f8f9fa; color: #212529; padding: 10px; border: 1px solid #ced4da;">
+					@(_users.FirstOrDefault(u => u.Id == editResourceWarning.UserId)?.UserFullName ?? "No asignado")
+				</span>
+			</div>
+		</div>
+
+		<br />
+
+		<div class="row align-items-center">
+			<div class="col-2 text-center">
+				Observación
+			</div>
+			<div class="col-10">
+				<textarea class="form-control"
+						  style="background-color: #f8f9fa; color: #212529; border: 1px solid #ced4da; width: 100%; padding: 10px; height: auto; resize: both;"
+						  rows="8"
+						  readonly>
+					@editResourceWarning.Comment
+				</textarea>
+			</div>
+		</div>
+
+		<br />
+
+
+		@if (authService.User.Permissions.Exists(x => x == (long)SectionsEnum.Inventario))
+		{
+			<div class="row align-items-center">
+				<div class="col-2 text-center">
+					Estado
+				</div>
+				<div class="col-10">
+					<InputSelect class="form-select" @bind-Value="editResourceWarning.State">
+						<option value="-1" disabled="@(editResourceWarning.State != -1)">Seleccione</option>
+						@foreach (var state in Enum.GetValues(typeof(ResourceWarningState)).Cast<ResourceWarningState>())
+						{
+							<option value="@((short)state)">@state</option>
+						}
+					</InputSelect>
+				</div>
+			</div>
+		}
+
+	</BodyTemplate>
+	<FooterTemplate>
+		<div class="col-3">
+			<Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Cerrar</Button>
+		</div>
+		<div class="col-3">
+			<Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="SaveEdit">Guardar</Button>
+		</div>
+	</FooterTemplate>
+</Modal>
+
+<Modal @ref="modalHistory" Title="Comentarios" Size="ModalSize.Large">
+
+	<BodyTemplate>
+		<div class="row">
+			<div class="col-12">
+				<div style="display: none">
+					@editResourceWarning.Id
+				</div>
+			</div>
+		</div>
+
+		<div class="row pt-1">
+			<div class="col-12" style="overflow: auto; margin-bottom: 10px">
+				@foreach (var message in editResourceWarning.ResourceWarningHistories)
+				{
+					<div class="row history-container">
+						<div class="col-12">
+							<div class="row" style="margin-top: 10px">
+								<div class="col-12 d-flex align-items-center justify-content-end">
+								</div>
+							</div>
+							<div class="row" style="margin-top: 10px">
+								<div class="col-4 d-flex align-items-center">
+									<b>@message.User.Username</b>
+								</div>
+								<div class="col-8 d-flex align-items-center justify-content-end">
+									@message.Date.ToString("dd/MM/yyyy HH:mm")
+								</div>
+							</div>
+							<hr>
+							<div class="row" style="margin-top: 10px; margin-bottom: 10px">
+								<div class="col-10">
+									@message.Comment
+								</div>
+								<div class="col-2 d-flex align-items-center justify-content-end">
+								</div>
+							</div>
+						</div>
+					</div>
+				}
+			</div>
+		</div>
+
+		@if (authService.User.Permissions.Exists(x => x == (long)SectionsEnum.Inventario))
+		{
+			<div class="row mt-4">
+				<div class="col-12">
+					<textarea class="form-control" style="border-radius:5px;" @bind="createResourceWarningHistory.Comment" rows="3"></textarea>
+				</div>
+			</div>
+		}
+
+	</BodyTemplate>
+	<FooterTemplate>
+		<div class="col-3">
+			<Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalHistoryClick">Cerrar</Button>
+		</div>
+
+		@if (authService.User.Permissions.Exists(x => x == (long)SectionsEnum.Inventario))
+		{
+			<div class="col-3">
+				<Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="SaveAddComment">Enviar</Button>
+			</div>
+		}
+
+	</FooterTemplate>
+</Modal>
+
+@code {
+	[Inject] private ToastService ToastService { get; set; }
+	[Inject] private PreloadService PreloadService { get; set; }
+
+	private Collapse collapseAgregar;
+	private Grid<DataContext.ResourceWarning> grid;
+
+	private Modal modal;
+	private Modal modalHistory;
+
+	private DataContext.ResourceWarning editResourceWarning { get; set; } = new DataContext.ResourceWarning();
+	private DataContext.ResourceWarning createResourceWarning { get; set; } = new DataContext.ResourceWarning();
+	private List<DataContext.ResourceWarning> _resourceWarnings = new List<DataContext.ResourceWarning>();
+
+	private DataContext.ResourceWarningHistory editResourceWarningHistory { get; set; } = new DataContext.ResourceWarningHistory();
+	private DataContext.ResourceWarningHistory createResourceWarningHistory { get; set; } = new DataContext.ResourceWarningHistory();
+	private List<DataContext.ResourceWarningHistory> _resourceWarningHistories = new List<DataContext.ResourceWarningHistory>();
+
+	private List<User> _users = new List<User>();
+	private List<User> _advertiser = new List<User>();
+
+	protected override async Task OnInitializedAsync()
+	{
+		try
+		{
+			PreloadService.Show();
+
+			await GetGrid();
+
+		}
+		catch (Exception ex)
+		{
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Danger,
+					Message = "Error inesperado al realizar la acción",
+					Title = "Error"
+				});
+		}
+		finally
+		{
+			PreloadService.Hide();
+		}
+
+		await base.OnInitializedAsync();
+	}
+
+	private async Task GetGrid()
+	{
+		_resourceWarnings = (await _resourceWarningService.GetAsync()).ToList();
+
+		_resourceWarnings = authService.User.ProfileId == (long)ProfileTypes.Administrador ||
+							authService.User.ProfileId == (long)ProfileTypes.RecursosHumanos ?
+							_resourceWarnings :
+							GetFilteredReourceWarnings(authService.User.Id, _resourceWarnings);
+
+		_users = await _userService.GetAsync();
+	}
+
+	private List<DataContext.ResourceWarning> GetFilteredReourceWarnings(long userId, List<DataContext.ResourceWarning> resourceWarnings)
+	{
+		return resourceWarnings.Where(rw => rw.AdvertiserId == userId).ToList();
+	}
+
+	private async Task GetCombos()
+	{
+		try
+		{
+			_resourceWarnings = await _resourceWarningService.GetAsync();
+			_resourceWarningHistories = await _resourceWarningHistoryService.GetAsync();
+		}
+		catch (Exception ex)
+		{
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Danger,
+					Message = "Error inesperado al realizar la acción",
+					Title = "Error"
+				});
+		}
+	}
+
+	private async Task SaveAdd()
+	{
+		try
+		{
+			createResourceWarning.State = default;
+
+			if (createResourceWarning.State == default)
+			{
+				createResourceWarning.State = (short)ResourceWarningState.Pendiente;
+			}
+
+			createResourceWarning.AdvertiserId = authService.User.Id;
+
+			createResourceWarning.Date = DateTime.Now;
+
+			await _resourceWarningService.AddAsync(createResourceWarning);
+
+			await GetGrid();
+			await grid.RefreshDataAsync();
+
+			changedState.InitChanges();
+
+			CancelAdd();
+
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Success,
+					Message = "Acción realizada con exito",
+					Title = "Agregar Ticket"
+				});
+		}
+		catch (Exception ex)
+		{
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Danger,
+					Message = "Error inesperado al realizar la acción",
+					Title = "Error"
+				});
+		}
+	}
+
+	private void CancelAdd()
+	{
+		createResourceWarning = new DataContext.ResourceWarning();
+	}
+
+	private async Task SaveEdit()
+	{
+		try
+		{
+			await _resourceWarningService.EditAsync(editResourceWarning);
+
+			await GetGrid();
+			await grid.RefreshDataAsync();
+			await OnHideModalClick();
+
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Success,
+					Message = "Acción realizada con exito",
+					Title = "Estado Actualizado"
+				});
+		}
+		catch (Exception ex)
+		{
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Danger,
+					Message = "Error inesperado al realizar la acción",
+					Title = "Error"
+				});
+		}
+	}
+
+	private async Task SaveAddComment()
+	{
+		try
+		{
+			createResourceWarningHistory.UserId = authService.User.Id;
+
+			createResourceWarningHistory.ResourceWarningId = editResourceWarning.Id;
+
+			await _resourceWarningHistoryService.AddAsync(createResourceWarningHistory);
+
+			createResourceWarningHistory.User = authService.User;
+
+			editResourceWarning.ResourceWarningHistories.Add(createResourceWarningHistory);
+
+			createResourceWarningHistory = new ResourceWarningHistory();
+
+			StateHasChanged();
+
+			CancelAdd();
+
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Success,
+					Message = "Acción realizada con éxito",
+					Title = "Comentario enviado"
+				});
+
+			await JSRuntime.InvokeVoidAsync("scrollToBottom");
+		}
+		catch (Exception ex)
+		{
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Danger,
+					Message = "Error inesperado al realizar la acción",
+					Title = "Error"
+				});
+		}
+	}
+
+	private async Task OnShowModalClick(DataContext.ResourceWarning resourceWarning)
+	{
+		editResourceWarning = resourceWarning;
+
+		await modal?.ShowAsync();
+	}
+
+	private async Task OnHideModalClick()
+	{
+		await modal?.HideAsync();
+	}
+
+	private async Task OnShowModalHistoryClick(DataContext.ResourceWarning resourceWarning)
+	{
+		editResourceWarning = resourceWarning;
+		await modalHistory?.ShowAsync();
+	}
+
+	private async Task OnHideModalHistoryClick()
+	{
+		await modalHistory?.HideAsync();
+	}
+
+	private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
+
+	private async Task SaveDefinitiveDelete(long Id)
+	{
+		var resourceWarnings = await _resourceWarningService.GetAsync();
+		var resourceWarning = resourceWarnings.FirstOrDefault(rw => rw.Id == Id);
+
+		if (resourceWarning != null && (ResourceWarningState)resourceWarning.State == ResourceWarningState.Pendiente)
+		{
+			try
+			{
+				await _resourceWarningService.DefinitiveDeleteAsync(Id);
+
+				await GetGrid();
+				await grid.RefreshDataAsync();
+				await OnHideModalClick();
+
+				ToastService.Notify(new ToastMessage()
+					{
+						Type = ToastType.Success,
+						Message = $"Acción realizada con éxito.",
+						Title = "Eliminar Incidencia"
+					});
+			}
+			catch (Exception ex)
+			{
+				ToastService.Notify(new ToastMessage()
+					{
+						Type = ToastType.Danger,
+						Message = "Error inesperado al realizar la acción",
+						Title = "Error"
+					});
+			}
+		}
+		else
+		{
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Warning,
+					Message = "No se eliminan expedientes Resueltos",
+					Title = "Error"
+				});
+		}
+	}
+
+	protected override void OnInitialized()
+	{
+		createResourceWarning.UserId = -1;
+	}
+}

@@ -1,0 +1,247 @@
+﻿@using BlazorBootstrap
+
+@using DataContext
+@using DataService.Interfaces.Management;
+@using DataService.State;
+@using DataService.Interfaces.ProjectManagement;
+
+@inherits TeamColaboration
+
+@inject ITeamService _service
+@inject IUserService _userService
+@inject IUserTeamService _userTeamService
+
+@inject ChangedState changedState
+
+<br />
+
+<Grid TItem="UserTeam" @ref="grid"
+	  Class="table table-hover table-bordered table-striped"
+	  Data="_userTeamsRequireManagement"
+	  AllowSorting="true"
+	  AllowFiltering="true"
+	  AllowPaging="true"
+	  PageSize="10"
+	  Responsive="true">
+
+	<GridColumn TItem="UserTeam" HeaderText="Nombre" SortKeySelector="item => item.User.UserFullName" PropertyName="Name" FilterOperator="FilterOperator.Contains">
+		@context.User.UserFullName
+	</GridColumn>
+
+	<GridColumn TItem="UserTeam" HeaderText="Equipo" SortKeySelector="item => item.Team.Name" PropertyName="Team" FilterOperator="FilterOperator.Contains">
+		@context.Team.Name
+	</GridColumn>
+
+	<GridColumn TItem="UserTeam" HeaderText="RollOn" SortKeySelector="item => item.RollOn" PropertyName="RollOn" FilterOperator="FilterOperator.Contains">
+		@context.RollOn
+	</GridColumn>
+
+	<GridColumn TItem="UserTeam" HeaderText="RollOff" SortKeySelector="item => item.RollOff" PropertyName="RollOff" FilterOperator="FilterOperator.Contains">
+		@context.RollOff
+	</GridColumn>
+
+	<GridColumn TItem="UserTeam" HeaderText="Asignación Vendida" SortKeySelector="item => item.AssignmentSold" PropertyName="AssignmentSold" FilterOperator="FilterOperator.Contains">
+		@context.AssignmentSold
+	</GridColumn>
+
+	<GridColumn TItem="UserTeam" HeaderText="Asignación Real" SortKeySelector="item => item.RealAssignment" PropertyName="RealAssignment" FilterOperator="FilterOperator.Contains">
+		@context.RealAssignment
+	</GridColumn>
+
+	<GridColumn TItem="UserTeam" HeaderText="Acciones" Sortable="false" Filterable="false">
+		<div class="row">
+			<div class="col-12 d-flex justify-content-center align-items-center">
+				<Button @onclick="async () => await OnShowModalClick(context)">
+					<span class="oi oi-pencil" aria-hidden="true" title="Editar"></span>
+				</Button>
+			</div>
+		</div>
+
+	</GridColumn>
+</Grid>
+
+<Modal @ref="modalEdit" Title="Gestionar Colaborador" Size="ModalSize.Large">
+	<BodyTemplate>
+		<div class="row">
+			<div class="col-12">
+				<h4><b>@editUserTeam.User.UserFullName</b></h4>
+				<div style="display: none">
+					@editUserTeam.Id
+				</div>
+			</div>
+		</div>
+
+		<div class="row pt-2">
+			<div class="col-4 d-flex align-items-center">
+				Roll On
+			</div>
+			<div class="col-8">
+				<InputDate Class="form-control" @bind-Value="@editUserTeam.RollOn"></InputDate>
+			</div>
+		</div>
+
+		<div class="row pt-2">
+			<div class="col-4 d-flex align-items-center">
+				Roll Off
+			</div>
+			<div class="col-8">
+				<InputDate Class="form-control" @bind-Value="@editUserTeam.RollOff"></InputDate>
+			</div>
+		</div>
+
+		<div class="row pt-2">
+			<div class="col-4 d-flex align-items-center">
+				Asignación Vendida
+			</div>
+			<div class="col-8">
+				<InputNumber Class="form-control" @bind-Value="@editUserTeam.AssignmentSold"></InputNumber>
+			</div>
+		</div>
+
+		<div class="row pt-2">
+			<div class="col-4 d-flex align-items-center">
+				Asignación Real
+			</div>
+			<div class="col-8">
+				<InputNumber Class="form-control" @bind-Value="@editUserTeam.RealAssignment"></InputNumber>
+			</div>
+		</div>
+
+		<div class="row pt-2">
+			<div class="col-4 d-flex align-items-center">
+				Comentarios
+			</div>
+			<div class="col-8">
+				<textarea class="form-control" rows="3" @bind="@editUserTeam.Comments"></textarea>
+			</div>
+		</div>
+
+
+
+	</BodyTemplate>
+	<FooterTemplate>
+		<div class="col-3">
+			<Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Cerrar</Button>
+		</div>
+		<div class="col-3">
+			<Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="SaveEdit">Guardar</Button>
+		</div>
+	</FooterTemplate>
+</Modal>
+
+@code {
+	[Inject] ToastService ToastService { get; set; }
+	private Grid<UserTeam> grid;
+	private Modal modalEdit;
+
+	private long modalId { get; set; }
+	private string modalName { get; set; }
+	private bool modalActive { get; set; }
+
+	private DateTime? rollOn { get; set; }
+	private DateTime? rollOff { get; set; }
+	private int assignmentSold { get; set; }
+	private int realAssignment { get; set; }
+	private string comments { get; set; }
+
+	private List<Team> _teams = new List<Team>();
+	private List<UserTeam> _userTeamsRequireManagement => _userTeams.Where(u => u.RequireManagement).ToList();
+	private List<UserTeam> _userTeams = new List<UserTeam>();
+
+	private DataContext.UserTeam editUserTeam { get; set; } = default!;
+
+	protected override async Task OnInitializedAsync()
+	{
+		await GetGrid();
+		await base.OnInitializedAsync();
+	}
+
+	private async Task GetGrid()
+	{
+		try
+		{
+			_teams = await _service.GetAsync();
+			_userTeams = _teams
+				.SelectMany(team => team.UserTeams)
+				.Where(userTeam => userTeam.RequireManagement)
+				.ToList();
+		}
+		catch (Exception ex)
+		{
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Danger,
+					Message = "Error inesperado al cargar los datos.",
+					Title = "Error"
+				});
+		}
+	}
+
+	private async Task OnShowModalClick(UserTeam userTeam)
+	{
+		editUserTeam = new();
+
+		rollOn = userTeam.RollOn != null ? DateTime.Parse(userTeam.RollOn.Value.ToString("dd/MM/yyyy")) : null!;
+		rollOff = userTeam.RollOff != null ? DateTime.Parse(userTeam.RollOff.Value.ToString("dd/MM/yyyy")) : null!;
+		assignmentSold = int.Parse(userTeam.AssignmentSold.ToString());
+		realAssignment = int.Parse(userTeam.RealAssignment.ToString());
+		comments = userTeam.Comments;
+
+		editUserTeam.Id = long.Parse(userTeam.Id.ToString());
+		editUserTeam.UserId = long.Parse(userTeam.UserId.ToString());
+		editUserTeam.RollOn = rollOn;
+		editUserTeam.RollOff = rollOff;
+		editUserTeam.AssignmentSold = assignmentSold;
+		editUserTeam.RealAssignment = realAssignment;
+		editUserTeam.Comments = comments;
+		editUserTeam.TeamId = long.Parse(userTeam.TeamId.ToString());
+		editUserTeam.Income = DateTime.Parse(userTeam.Income.ToString("dd/MM/yyyy"));
+		editUserTeam.Outcome = editUserTeam.Outcome != null ? DateTime.Parse(userTeam.Outcome.Value.ToString("dd/MM/yyyy")) : null!;
+		editUserTeam.RequireManagement = userTeam.RequireManagement ? true : false;
+		editUserTeam.Temporary = userTeam.Temporary ? true : false;
+		editUserTeam.User = userTeam.User;
+		editUserTeam.Team = userTeam.Team;
+
+		await modalEdit?.ShowAsync();
+
+	}
+
+	private async Task OnHideModalClick()
+	{
+		rollOn = null!;
+		rollOff = null!;
+		assignmentSold = 160;
+		realAssignment = 160;
+		comments = "";
+
+		await modalEdit?.HideAsync();
+	}
+
+	private async Task SaveEdit()
+	{
+		try
+		{
+			await _userTeamService.EditAsync(editUserTeam);
+
+			await GetGrid();
+			await grid.RefreshDataAsync();
+			await OnHideModalClick();
+
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Success,
+					Message = $"Acción realizada con éxito.",
+					Title = "Editar Colaborador"
+				});
+		}
+		catch (Exception ex)
+		{
+			ToastService.Notify(new ToastMessage()
+				{
+					Type = ToastType.Danger,
+					Message = "Error inesperado al realizar la acción",
+					Title = "Error"
+				});
+		}
+	}
+}
