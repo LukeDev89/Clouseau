@@ -9,11 +9,11 @@ namespace DataService.Interfaces.Management
 {
     public interface IFeedBackStandarService
     {
-        Task<List<FeedbackStandar>> GetAsync();
+        Task<List<FeedBackStandar>> GetAsync();
 
-        Task AddAsync(FeedbackStandar standar);
+        Task AddAsync(FeedBackStandar standar);
 
-        Task EditAsync(FeedbackStandar standar);
+        Task EditAsync(FeedBackStandar standar);
 
         Task DeleteAsync(long id);
 

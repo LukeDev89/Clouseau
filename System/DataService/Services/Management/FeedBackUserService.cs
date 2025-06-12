@@ -18,13 +18,13 @@ namespace DataService.Services.Management
             _repository = repository;
         }
 
-        public async Task<List<FeedbackUser>> GetAsync() => await _repository.GetAsync();
+        public async Task<List<FeedBackUser>> GetAsync() => await _repository.GetAsync();
 
-        public async Task<List<FeedbackUser>> GetByUserIdAsync(long userId) => await _repository.GetByUserIdAsync(userId);
+        public async Task<List<FeedBackUser>> GetByUserIdAsync(long userId) => await _repository.GetByUserIdAsync(userId);
 
-        public async Task AddAsync(FeedbackUser user) => await _repository.AddAsync(user);
+        public async Task AddAsync(FeedBackUser user) => await _repository.AddAsync(user);
 
-        public async Task EditAsync(FeedbackUser user) => await _repository.EditAsync(user);
+        public async Task EditAsync(FeedBackUser user) => await _repository.EditAsync(user);
 
         public async Task DeleteAsync(long id) => await _repository.DeleteAsync(id);
 

@@ -212,15 +212,15 @@ Responsive="true">
     [Inject] private PreloadService PreloadService { get; set; }
 
     private Collapse collapseAgregar;
-    private Grid<FeedbackStandarType> grid;
+    private Grid<FeedBackStandarType> grid;
 
     private Modal modal;
 
-    private FeedbackStandarType editStandarType { get; set; } = new FeedbackStandarType();
-    private FeedbackStandarType createStandarType { get; set; } = new FeedbackStandarType() { FeedbackStandarId = -1 };
+    private FeedBackStandarType editStandarType { get; set; } = new FeedBackStandarType();
+    private FeedBackStandarType createStandarType { get; set; } = new FeedBackStandarType() { FeedbackStandarId = -1 };
 
-    private List<FeedbackStandarType> _standarType = new List<FeedbackStandarType>();
-    private List<FeedbackStandar> _standars = new List<FeedbackStandar>();
+    private List<FeedBackStandarType> _standarType = new List<FeedBackStandarType>();
+    private List<FeedBackStandar> _standars = new List<FeedBackStandar>();
     private List<Team> _teams = new List<Team>();
 
     private FeedbackStatus selectedFeedbackStatus { get; set; } = FeedbackStatus.Deficiente;
@@ -376,7 +376,7 @@ Responsive="true">
         }
     }
 
-    private async Task OnShowModalClick(FeedbackStandarType standarType)
+    private async Task OnShowModalClick(FeedBackStandarType standarType)
     {
         editStandarType = standarType;
 
@@ -395,7 +395,7 @@ Responsive="true">
 
     private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
 
-    private async Task ToggleActiveAsync(FeedbackStandarType feedbackStandarType)
+    private async Task ToggleActiveAsync(FeedBackStandarType feedbackStandarType)
     {
         if (feedbackStandarType == null) return;
 

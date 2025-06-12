@@ -22,7 +22,7 @@ namespace DataContext.Repositories.Management
             RecoveryToken = configuration.GetSection("Tokens:RecoveryToken").Value;
         }
 
-        public async Task<List<FeedbackPeriod>> GetAsync()  
+        public async Task<List<FeedBackPeriod>> GetAsync()  
         {
             using var _context = await _contextFactory.CreateDbContextAsync();  
 
@@ -35,7 +35,7 @@ namespace DataContext.Repositories.Management
 			return periods;
 		}
    
-        public async Task AddAsync(FeedbackPeriod period)
+        public async Task AddAsync(FeedBackPeriod period)
         {
             using var _context = await _contextFactory.CreateDbContextAsync();
 
@@ -44,7 +44,7 @@ namespace DataContext.Repositories.Management
             await _context.SaveChangesAsync();
         }
 
-		public async Task EditAsync(FeedbackPeriod period)
+		public async Task EditAsync(FeedBackPeriod period)
 		{
 			try
 			{

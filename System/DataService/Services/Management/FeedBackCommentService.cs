@@ -18,11 +18,11 @@ namespace DataService.Services.Management
             _repository = repository;
         }
 
-        public async Task<List<FeedbackComment>> GetAsync() => await _repository.GetAsync();
+        public async Task<List<FeedBackComment>> GetAsync() => await _repository.GetAsync();
 
-        public async Task AddAsync(FeedbackComment comment) => await _repository.AddAsync(comment);
+        public async Task AddAsync(FeedBackComment comment) => await _repository.AddAsync(comment);
 
-        public async Task EditAsync(FeedbackComment comment) => await _repository.EditAsync(comment);
+        public async Task EditAsync(FeedBackComment comment) => await _repository.EditAsync(comment);
 
         public async Task DeleteAsync(long id) => await _repository.DeleteAsync(id);
 

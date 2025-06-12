@@ -22,7 +22,7 @@ namespace DataContext.Repositories.Management
             RecoveryToken = configuration.GetSection("Tokens:RecoveryToken").Value;
         }
 
-        public async Task<List<FeedbackComment>> GetAsync()
+        public async Task<List<FeedBackComment>> GetAsync()
         {
             using var _context = await _contextFactory.CreateDbContextAsync();
             var prueba = await _context.FeedbackComments.Include(x => x.User) .Include(x => x.FeedbackUser)
@@ -33,7 +33,7 @@ namespace DataContext.Repositories.Management
 
 		}
 
-        public async Task AddAsync(FeedbackComment comment)
+        public async Task AddAsync(FeedBackComment comment)
         {
             using var _context = await _contextFactory.CreateDbContextAsync();
 
@@ -42,7 +42,7 @@ namespace DataContext.Repositories.Management
             await _context.SaveChangesAsync();
         }
 
-        public async Task EditAsync(FeedbackComment comment)
+        public async Task EditAsync(FeedBackComment comment)
         {
             using var _context = await _contextFactory.CreateDbContextAsync();
 

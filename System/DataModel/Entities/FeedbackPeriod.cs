@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace DataContext;
 
-public partial class FeedbackPeriod
+public partial class FeedBackPeriod
 {
     public long Id { get; set; }
 
@@ -13,9 +13,9 @@ public partial class FeedbackPeriod
 
     public long? FeedbackStandarTypeId { get; set; }
 
-    public virtual FeedbackItem FeedbackItem { get; set; } = null!;
+    public virtual FeedBackItem FeedbackItem { get; set; } = null!;
 
-    public virtual FeedbackStandarType? FeedbackStandarType { get; set; }
+    public virtual FeedBackStandarType? FeedbackStandarType { get; set; }
 
-    public virtual FeedbackUser FeedbackUser { get; set; } = null!;
+    public virtual FeedBackUser FeedbackUser { get; set; } = null!;
 }

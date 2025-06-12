@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace DataContext;
 
-public partial class FeedbackImprovement
+public partial class FeedBackImprovement
 {
     public long Id { get; set; }
 
@@ -11,7 +11,7 @@ public partial class FeedbackImprovement
 
     public string Description { get; set; } = null!;
 
-    public bool? Active { get; set; }
+    public bool Active { get; set; }
 
-    public virtual ICollection<FeedbackImprovementUser> FeedbackImprovementUsers { get; set; } = new List<FeedbackImprovementUser>();
+    public virtual ICollection<FeedBackImprovementUser> FeedbackImprovementUsers { get; set; } = new List<FeedBackImprovementUser>();
 }

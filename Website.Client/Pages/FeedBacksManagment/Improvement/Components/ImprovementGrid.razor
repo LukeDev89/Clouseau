@@ -20,7 +20,7 @@
 
     <GridColumn TItem="FeedBackImprovement" HeaderText="Activo" Sortable="false" Filterable="false">
         <div style="text-align: center;">
-            @if (context.Active.HasValue && context.Active.Value)
+            @if (context.Active)
             {
                 <span class="oi oi-circle-check" aria-hidden="true" style="color: var(--l-green)"></span>
             }
@@ -39,9 +39,9 @@
                 </Button>
 
                 <Button @onclick="() => OnToggleActive.InvokeAsync(context)">
-                    @if (context != null && context.Active.HasValue)
+                    @if (context != null && context.Active)
                     {
-                        if (context.Active.Value)
+                        if (context.Active)
                         {
                             <span class="oi oi-circle-x" style="color: var(--l-red)" aria-hidden="true" title="Inhabilitar"></span>
                         }

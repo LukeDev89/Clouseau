@@ -19,6 +19,7 @@
 @inject IClientService _clientService
 @inject AuthService _authService
 @inject ChangedState _changedState
+@inject ToastService ToastService
 
 <br />
 
@@ -154,7 +155,7 @@
                                 </div>
                                 <div class="row">
                                     <div class="col-12">
-                                        <span style="font-size: 14px">@progress.Description</span>
+                                        <span style="font-size: 14px">@progress.Comment</span>
                                     </div>
                                 </div>
                             </div>
@@ -180,7 +181,7 @@
     private List<Project> _projects = new();
     private List<Client> _clients = new();
     private List<TaskType> _taskTypes = new();
-    private List<TaskEstimation> _taskEstimations = new();
+    private List<ProjectTaskEstimation> _taskEstimations = new();
     private List<Role> _roles = new();
     private List<TaskProgress> _taskProgress = new();
     

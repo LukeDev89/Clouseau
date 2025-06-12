@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace DataContext;
 
-public partial class FeedbackImprovementUser
+public partial class FeedBackImprovementUser
 {
     public long Id { get; set; }
 
@@ -13,7 +13,7 @@ public partial class FeedbackImprovementUser
 
     public string? Description { get; set; }
 
-    public virtual FeedbackImprovement FeedbackImprovement { get; set; } = null!;
+    public virtual FeedBackImprovement FeedbackImprovement { get; set; } = null!;
 
-    public virtual FeedbackUser FeedbackUser { get; set; } = null!;
+    public virtual FeedBackUser FeedbackUser { get; set; } = null!;
 }

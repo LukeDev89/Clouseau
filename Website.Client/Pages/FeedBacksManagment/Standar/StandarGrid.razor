@@ -176,14 +176,14 @@
     [Inject] private PreloadService PreloadService { get; set; }
 
     private Collapse collapseAgregar;
-    private Grid<FeedbackStandar> grid;
+    private Grid<FeedBackStandar> grid;
 
     private Modal modal;
 
-    private FeedbackStandar editStandar { get; set; } = new FeedbackStandar();
-    private FeedbackStandar createStandar { get; set; } = new FeedbackStandar();
+    private FeedBackStandar editStandar { get; set; } = new FeedBackStandar();
+    private FeedBackStandar createStandar { get; set; } = new FeedBackStandar();
 
-    private List<FeedbackStandar> _standars = new List<FeedbackStandar>();
+    private List<FeedBackStandar> _standars = new List<FeedBackStandar>();
 
     protected override async Task OnInitializedAsync()
     {
@@ -228,7 +228,7 @@
         {
             createStandar.Active = true;
             await _standarService.AddAsync(createStandar);
-            createStandar = new FeedbackStandar();
+            createStandar = new FeedBackStandar();
 
             await GetGrid();
             await grid.RefreshDataAsync();
@@ -318,7 +318,7 @@
         }
     }
 
-    private async Task OnShowModalClick(FeedbackStandar standar)
+    private async Task OnShowModalClick(FeedBackStandar standar)
     {
         editStandar = standar;
 
@@ -333,7 +333,7 @@
 
     private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
 
-    private async Task ToggleActiveAsync(FeedbackStandar feedbackstandar)
+    private async Task ToggleActiveAsync(FeedBackStandar feedbackstandar)
     {
         if (feedbackstandar == null) return;
 

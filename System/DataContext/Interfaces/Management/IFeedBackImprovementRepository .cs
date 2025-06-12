@@ -8,11 +8,11 @@ namespace DataContext.Interfaces.Management
 {
     public interface IFeedBackImprovementRepository
     {
-        Task<List<FeedbackImprovement>> GetAsync();
+        Task<List<FeedBackImprovement>> GetAsync();
 
-        Task AddAsync(FeedbackImprovement improvement);
+        Task AddAsync(FeedBackImprovement improvement);
 
-        Task EditAsync(FeedbackImprovement improvement);
+        Task EditAsync(FeedBackImprovement improvement);
 
         Task DeleteAsync(long id);
 

@@ -186,18 +186,18 @@
     [Inject] private PreloadService PreloadService { get; set; }
 
     private Collapse collapseAgregar;
-    private Grid<FeedbackItem> grid;
+    private Grid<FeedBackItem> grid;
 
     private Modal modal;
 
-    private FeedbackItem editItem { get; set; } = new FeedbackItem();
-    private FeedbackItem createItem { get; set; } = new FeedbackItem();
+    private FeedBackItem editItem { get; set; } = new FeedBackItem();
+    private FeedBackItem createItem { get; set; } = new FeedBackItem();
 
-    private FeedbackStandar editStandar { get; set; } = new FeedbackStandar();
+    private FeedBackStandar editStandar { get; set; } = new FeedBackStandar();
 
 
-    private List<FeedbackItem> _items = new List<FeedbackItem>();
-    private List<FeedbackStandar> _standars = new List<FeedbackStandar>();
+    private List<FeedBackItem> _items = new List<FeedBackItem>();
+    private List<FeedBackStandar> _standars = new List<FeedBackStandar>();
 
 
     protected override async Task OnInitializedAsync()
@@ -244,7 +244,7 @@
         {
             createItem.Active = true;
             await _itemService.AddAsync(createItem);
-            createItem = new FeedbackItem();
+            createItem = new FeedBackItem();
 
             await GetGrid();
             await grid.RefreshDataAsync();
@@ -342,7 +342,7 @@
         }
     }
 
-    private async Task OnShowModalClick(FeedbackItem item)
+    private async Task OnShowModalClick(FeedBackItem item)
     {
         editItem = item;
         await modal?.ShowAsync();
@@ -356,7 +356,7 @@
 
     private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
 
-    private async Task ToggleActiveAsync(FeedbackItem feedbackitem)
+    private async Task ToggleActiveAsync(FeedBackItem feedbackitem)
     {
         if (feedbackitem == null) return;
 

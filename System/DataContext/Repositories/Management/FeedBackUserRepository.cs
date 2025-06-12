@@ -19,7 +19,7 @@ namespace DataContext.Repositories.Management
             _contextFactory = context;
         }
 
-        public async Task<List<FeedbackUser>> GetAsync()
+        public async Task<List<FeedBackUser>> GetAsync()
         {
             using var _context = await _contextFactory.CreateDbContextAsync();
             var prueba = await _context.FeedbackUsers
@@ -33,7 +33,7 @@ namespace DataContext.Repositories.Management
             return prueba;
         }
 
-        public async Task<List<FeedbackUser>> GetByUserIdAsync(long userId)
+        public async Task<List<FeedBackUser>> GetByUserIdAsync(long userId)
         {
             using var _context = await _contextFactory.CreateDbContextAsync();
 
@@ -104,7 +104,7 @@ namespace DataContext.Repositories.Management
             }
         }
 
-        public async Task AddAsync(FeedbackUser user)
+        public async Task AddAsync(FeedBackUser user)
         {
             using var _context = await _contextFactory.CreateDbContextAsync();
 
@@ -113,7 +113,7 @@ namespace DataContext.Repositories.Management
             await _context.SaveChangesAsync();
         }
 
-        public async Task EditAsync(FeedbackUser user)
+        public async Task EditAsync(FeedBackUser user)
         {
             using var _context = await _contextFactory.CreateDbContextAsync();
 

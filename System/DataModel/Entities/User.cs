@@ -97,9 +97,9 @@ public partial class User
 
     public virtual ICollection<RagStatus> RagStatuses { get; set; } = new List<RagStatus>();
 
-    public virtual ICollection<FeedbackComment> FeedbackComments { get; set; } = new List<FeedbackComment>();
+    public virtual ICollection<FeedBackComment> FeedbackComments { get; set; } = new List<FeedBackComment>();
 
-    public virtual ICollection<FeedbackUser> FeedbackUsers { get; set; } = new List<FeedbackUser>();
+    public virtual ICollection<FeedBackUser> FeedbackUsers { get; set; } = new List<FeedBackUser>();
 
     public virtual ICollection<InventoryLicense> InventoryLicenses { get; set; } = new List<InventoryLicense>();
 

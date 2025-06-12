@@ -18,11 +18,11 @@ namespace DataService.Services.Management
             _repository = repository;
         }
 
-        public async Task<List<FeedbackPeriod>> GetAsync() => await _repository.GetAsync();
+        public async Task<List<FeedBackPeriod>> GetAsync() => await _repository.GetAsync();
 
-        public async Task AddAsync(FeedbackPeriod period) => await _repository.AddAsync(period);
+        public async Task AddAsync(FeedBackPeriod period) => await _repository.AddAsync(period);
 
-        public async Task EditAsync(FeedbackPeriod period) => await _repository.EditAsync(period);
+        public async Task EditAsync(FeedBackPeriod period) => await _repository.EditAsync(period);
 
     }
 }

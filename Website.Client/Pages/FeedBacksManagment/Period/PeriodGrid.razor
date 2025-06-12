@@ -518,48 +518,35 @@ AllowDetailView="true">
     [Inject] private ToastService ToastService { get; set; }
     [Inject] protected PreloadService PreloadService { get; set; }
 
-    private Dictionary<long, bool> periodButtonStates = new Dictionary<long, bool>();
-    private Dictionary<long, bool> improvementButtonStates = new Dictionary<long, bool>();
-
-    private long idFeedBackUser = 0;
-    private string editDescriptionTemp;
-
-    private Modal modal;
-    private Modal modalComments;
-    private Modal modalPeriod;
-    private Modal modalImprovement;
-    private Modal modalImprovementUser;
-
-    private Collapse collapseAddFeedBackUser;
     private Collapse collapseAddImprovementUser;
 
-    private Grid<FeedbackUser> grid;
-    private Grid<FeedbackPeriod> gridPeriod;
-    private Grid<FeedbackImprovementUser> gridImprovementUser;
+    private Grid<FeedBackUser> grid;
+    private Grid<FeedBackPeriod> gridPeriod;
+    private Grid<FeedBackImprovementUser> gridImprovementUser;
 
-    private FeedbackUser editFeedbackuser { get; set; } = new FeedbackUser();
-    private FeedbackUser createFeedbackuser { get; set; } = new FeedbackUser();
+    private FeedBackUser editFeedbackuser { get; set; } = new FeedBackUser();
+    private FeedBackUser createFeedbackuser { get; set; } = new FeedBackUser();
 
-    private FeedbackPeriod createFeedbackPeriod { get; set; } = new FeedbackPeriod();
+    private FeedBackPeriod createFeedbackPeriod { get; set; } = new FeedBackPeriod();
 
-    private FeedbackImprovement editFeedbackImprovement { get; set; } = new FeedbackImprovement();
-    private FeedbackImprovement createFeedbackImprovement { get; set; } = new FeedbackImprovement();
+    private FeedBackImprovement editFeedbackImprovement { get; set; } = new FeedBackImprovement();
+    private FeedBackImprovement createFeedbackImprovement { get; set; } = new FeedBackImprovement();
 
-    private FeedbackImprovementUser editFeedbackImprovementUsers { get; set; } = new FeedbackImprovementUser();
-    private FeedbackImprovementUser createFeedbackImprovementUsers { get; set; } = new FeedbackImprovementUser();
+    private FeedBackImprovementUser editFeedbackImprovementUsers { get; set; } = new FeedBackImprovementUser();
+    private FeedBackImprovementUser createFeedbackImprovementUsers { get; set; } = new FeedBackImprovementUser();
 
-    private FeedbackComment createFeedbackComments { get; set; } = new FeedbackComment();
+    private FeedBackComment createFeedbackComments { get; set; } = new FeedBackComment();
 
-    private List<FeedbackUser> _feedBackUsers = new List<FeedbackUser>();
+    private List<FeedBackUser> _feedBackUsers = new List<FeedBackUser>();
 
     private List<User> _users = new List<User>();
-    private List<FeedbackItem> _feedBackItems = new List<FeedbackItem>();
-    private List<FeedbackStandarType> _feedBackStandarTypes = new List<FeedbackStandarType>();
-    private List<FeedbackImprovement> _feedBackImprovements = new List<FeedbackImprovement>();
-    private List<FeedbackImprovementUser> _feedBackImprovementUsers = new List<FeedbackImprovementUser>();
+    private List<FeedBackItem> _feedBackItems = new List<FeedBackItem>();
+    private List<FeedBackStandarType> _feedBackStandarTypes = new List<FeedBackStandarType>();
+    private List<FeedBackImprovement> _feedBackImprovements = new List<FeedBackImprovement>();
+    private List<FeedBackImprovementUser> _feedBackImprovementUsers = new List<FeedBackImprovementUser>();
 
     private long currentUserId;
-    private FeedbackUser selectedFeedBackUser = new FeedbackUser();
+    private FeedBackUser selectedFeedBackUser = new FeedBackUser();
 
     protected override async Task OnInitializedAsync()
     {
@@ -669,7 +656,7 @@ AllowDetailView="true">
         createFeedbackuser.Period = DateTime.Now;
         createFeedbackuser.User = null!;
         createFeedbackComments.Comment = null!;
-        createFeedbackImprovementUsers = new FeedbackImprovementUser();
+        createFeedbackImprovementUsers = new FeedBackImprovementUser();
         createFeedbackImprovement.Id = -1;
     }
 
@@ -712,7 +699,7 @@ AllowDetailView="true">
 
             foreach (var feedbackItemId in feedbackItemIds)
             {
-                var newFeedbackPeriod = new FeedbackPeriod
+                var newFeedbackPeriod = new FeedBackPeriod
                     {
                         FeedbackUserId = createFeedbackPeriod.FeedbackUserId,
                         FeedbackStandarTypeId = null,
@@ -722,8 +709,8 @@ AllowDetailView="true">
                 await _feedBackPeriodService.AddAsync(newFeedbackPeriod);
             }
 
-            createFeedbackPeriod = new FeedbackPeriod();
-            createFeedbackuser = new FeedbackUser();
+            createFeedbackPeriod = new FeedBackPeriod();
+            createFeedbackuser = new FeedBackUser();
 
             await GetGrid();
 
@@ -759,7 +746,7 @@ AllowDetailView="true">
             createFeedbackComments.User = authService.User;
             editFeedbackuser.FeedbackComments.Add(createFeedbackComments);
 
-            createFeedbackComments = new FeedbackComment();
+            createFeedbackComments = new FeedBackComment();
 
             StateHasChanged();
 
@@ -859,7 +846,7 @@ AllowDetailView="true">
         }
     }
 
-    private async Task OnShowModalComment(FeedbackUser feedbackUser)
+    private async Task OnShowModalComment(FeedBackUser feedbackUser)
     {
         editFeedbackuser = feedbackUser;
         await modalComments?.ShowAsync();
@@ -870,7 +857,7 @@ AllowDetailView="true">
         await modalComments?.HideAsync();
     }
 
-    private async Task OnShowModalPeriod(FeedbackUser feedbackUser)
+    private async Task OnShowModalPeriod(FeedBackUser feedbackUser)
     {
         editFeedbackuser = feedbackUser;
         await modalPeriod?.ShowAsync();
@@ -881,10 +868,10 @@ AllowDetailView="true">
         await modalPeriod?.HideAsync();
     }
 
-    private async Task OnShowModalImprovement(FeedbackUser feedbackUser , long userId) 
+    private async Task OnShowModalImprovement(FeedBackUser feedbackUser , long userId) 
     {
         currentUserId = userId;
-        selectedFeedBackUser = new FeedbackUser
+        selectedFeedBackUser = new FeedBackUser
             {
                 Id = userId,              
             };
@@ -898,7 +885,7 @@ AllowDetailView="true">
         await modalImprovement?.HideAsync();
     }
 
-    private async Task OnShowModalClickImprovementUser(FeedbackImprovementUser feedbackImprovementUser)
+    private async Task OnShowModalClickImprovementUser(FeedBackImprovementUser feedbackImprovementUser)
     {
         // Asignación correcta a la propiedad editFeedbackImprovementUsers
         editFeedbackImprovementUsers = feedbackImprovementUser;
@@ -1008,7 +995,7 @@ AllowDetailView="true">
         }
     }
 
-    private async Task OnStandarTypeSelected(FeedbackPeriod period, long? value)
+    private async Task OnStandarTypeSelected(FeedBackPeriod period, long? value)
     {
         var selectedType = _feedBackStandarTypes.FirstOrDefault(t => t.Id == value);
 

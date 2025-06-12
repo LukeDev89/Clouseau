@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace DataContext;
 
-public partial class FeedbackUser
+public partial class FeedBackUser
 {
     public long Id { get; set; }
 
@@ -20,11 +20,11 @@ public partial class FeedbackUser
 
     public DateTime? Deleted { get; set; }
 
-    public virtual ICollection<FeedbackComment> FeedbackComments { get; set; } = new List<FeedbackComment>();
+    public virtual ICollection<FeedBackComment> FeedbackComments { get; set; } = new List<FeedBackComment>();
 
-    public virtual ICollection<FeedbackImprovementUser> FeedbackImprovementUsers { get; set; } = new List<FeedbackImprovementUser>();
+    public virtual ICollection<FeedBackImprovementUser> FeedbackImprovementUsers { get; set; } = new List<FeedBackImprovementUser>();
 
-    public virtual ICollection<FeedbackPeriod> FeedbackPeriods { get; set; } = new List<FeedbackPeriod>();
+    public virtual ICollection<FeedBackPeriod> FeedbackPeriods { get; set; } = new List<FeedBackPeriod>();
 
 	public virtual User User { get; set; } = null!;
 }

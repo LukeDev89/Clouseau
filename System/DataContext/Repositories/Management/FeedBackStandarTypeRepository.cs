@@ -22,7 +22,7 @@ namespace DataContext.Repositories.Management
             RecoveryToken = configuration.GetSection("Tokens:RecoveryToken").Value;
         }
 
-        public async Task<List<FeedbackStandarType>> GetAsync()
+        public async Task<List<FeedBackStandarType>> GetAsync()
         {
             using var _context = await _contextFactory.CreateDbContextAsync();
             return await _context.FeedbackStandarTypes
@@ -30,12 +30,12 @@ namespace DataContext.Repositories.Management
 				.ToListAsync();     
         }
 
-        public async Task AddAsync(FeedbackStandarType standarType)            
+        public async Task AddAsync(FeedBackStandarType standarType)            
         {
             try
             {
                 using var _context = await _contextFactory.CreateDbContextAsync();
-                FeedbackStandarType userCreate = new FeedbackStandarType 
+                FeedBackStandarType userCreate = new FeedBackStandarType 
                 {
 					FeedbackStandarId = standarType.FeedbackStandarId,
                     Active = standarType.Active,
@@ -53,7 +53,7 @@ namespace DataContext.Repositories.Management
             }
         }
 
-        public async Task EditAsync(FeedbackStandarType standarType)
+        public async Task EditAsync(FeedBackStandarType standarType)
         {
             using var _context = await _contextFactory.CreateDbContextAsync();
 
@@ -88,13 +88,13 @@ namespace DataContext.Repositories.Management
             await _context.SaveChangesAsync();
         }
       
-        public async Task OnSelectedStatusChanged (FeedbackStandarType feedbackStatus)
+        public async Task OnSelectedStatusChanged (FeedBackStandarType feedbackStatus)
 
         {
             try
             {
                 using var _context = await _contextFactory.CreateDbContextAsync();
-                FeedbackStandarType userCreate = new FeedbackStandarType
+                FeedBackStandarType userCreate = new FeedBackStandarType
                 {
                     Id = feedbackStatus.Id,                 
                     Name = feedbackStatus.Name

@@ -10,17 +10,17 @@ namespace DataService.Interfaces.Management
 {
     public interface IFeedBackStandarTypeService
     {
-        Task<List<FeedbackStandarType>> GetAsync();
+        Task<List<FeedBackStandarType>> GetAsync();
 
-        Task AddAsync(FeedbackStandarType standarType);
+        Task AddAsync(FeedBackStandarType standarType);
 
-        Task EditAsync(FeedbackStandarType standarType);
+        Task EditAsync(FeedBackStandarType standarType);
 
         Task DeleteAsync(long id);
 
         Task DefinitiveDeleteAsync(long standarTypeId);
 
-        Task OnSelectedStatusChanged(FeedbackStandarType feedbackStatus);
+        Task OnSelectedStatusChanged(FeedBackStandarType feedbackStatus);
 
     }
 }

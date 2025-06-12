@@ -9,11 +9,11 @@ namespace DataService.Interfaces.Management
 {
     public interface IFeedBackPeriodService
     {
-        Task<List<FeedbackPeriod>> GetAsync();
+        Task<List<FeedBackPeriod>> GetAsync();
 
-        Task AddAsync(FeedbackPeriod period);
+        Task AddAsync(FeedBackPeriod period);
 
-        Task EditAsync(FeedbackPeriod period);
+        Task EditAsync(FeedBackPeriod period);
 
     }
 }

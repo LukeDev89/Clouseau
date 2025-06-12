@@ -178,12 +178,12 @@
     [Inject] private PreloadService PreloadService { get; set; }
 
     private Collapse collapseAgregar;
-    private Grid<FeedbackImprovement> grid;
+    private Grid<FeedBackImprovement> grid;
 
     private Modal modal;
-    private FeedbackImprovement editImprovement { get; set; } = new FeedbackImprovement();
-    private FeedbackImprovement createImprovement { get; set; } = new FeedbackImprovement();
-    private List<FeedbackImprovement> _improvements = new List<FeedbackImprovement>();
+    private FeedBackImprovement editImprovement { get; set; } = new FeedBackImprovement();
+    private FeedBackImprovement createImprovement { get; set; } = new FeedBackImprovement();
+    private List<FeedBackImprovement> _improvements = new List<FeedBackImprovement>();
 
     protected override async Task OnInitializedAsync()
     {
@@ -255,7 +255,7 @@
 
     private void CancelAdd()
     {
-        createImprovement = new FeedbackImprovement();
+        createImprovement = new FeedBackImprovement();
     }
 
     private async Task SaveEdit()
@@ -315,7 +315,7 @@
     }
 
 
-    private async Task OnShowModalClick(FeedbackImprovement improvement)
+    private async Task OnShowModalClick(FeedBackImprovement improvement)
     {
         editImprovement = improvement;
 
@@ -330,7 +330,7 @@
 
     private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
 
-    private async Task ToggleActiveAsync(FeedbackImprovement feedbackImprovement)
+    private async Task ToggleActiveAsync(FeedBackImprovement feedbackImprovement)
     {
         if (feedbackImprovement == null) return;
 

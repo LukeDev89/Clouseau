@@ -34,21 +34,21 @@ public partial class ClouseauContext : DbContext
 
     public virtual DbSet<CustomPermission> CustomPermissions { get; set; }
 
-    public virtual DbSet<FeedbackComment> FeedbackComments { get; set; }
+    public virtual DbSet<FeedBackComment> FeedbackComments { get; set; }
 
-    public virtual DbSet<FeedbackImprovement> FeedbackImprovements { get; set; }
+    public virtual DbSet<FeedBackImprovement> FeedbackImprovements { get; set; }
 
-    public virtual DbSet<FeedbackImprovementUser> FeedbackImprovementUsers { get; set; }
+    public virtual DbSet<FeedBackImprovementUser> FeedbackImprovementUsers { get; set; }
 
-    public virtual DbSet<FeedbackItem> FeedbackItems { get; set; }
+    public virtual DbSet<FeedBackItem> FeedbackItems { get; set; }
 
-    public virtual DbSet<FeedbackPeriod> FeedbackPeriods { get; set; }
+    public virtual DbSet<FeedBackPeriod> FeedbackPeriods { get; set; }
 
-    public virtual DbSet<FeedbackStandar> FeedbackStandars { get; set; }
+    public virtual DbSet<FeedBackStandar> FeedbackStandars { get; set; }
 
-    public virtual DbSet<FeedbackStandarType> FeedbackStandarTypes { get; set; }
+    public virtual DbSet<FeedBackStandarType> FeedbackStandarTypes { get; set; }
 
-    public virtual DbSet<FeedbackUser> FeedbackUsers { get; set; }
+    public virtual DbSet<FeedBackUser> FeedbackUsers { get; set; }
 
     public virtual DbSet<GadgetExpress> GadgetExpresses { get; set; }
 
@@ -279,7 +279,7 @@ public partial class ClouseauContext : DbContext
                 .HasConstraintName("FK_CustomPermission_Users");
         });
 
-        modelBuilder.Entity<FeedbackComment>(entity =>
+        modelBuilder.Entity<FeedBackComment>(entity =>
         {
             entity.ToTable("feedbackComment");
 
@@ -302,7 +302,7 @@ public partial class ClouseauContext : DbContext
                 .HasConstraintName("FK_feedbackComment_Users");
         });
 
-        modelBuilder.Entity<FeedbackImprovement>(entity =>
+        modelBuilder.Entity<FeedBackImprovement>(entity =>
         {
             entity.ToTable("feedbackImprovement");
 
@@ -319,7 +319,7 @@ public partial class ClouseauContext : DbContext
                 .HasColumnName("name");
         });
 
-        modelBuilder.Entity<FeedbackImprovementUser>(entity =>
+        modelBuilder.Entity<FeedBackImprovementUser>(entity =>
         {
             entity.ToTable("feedbackImprovementUser");
 
@@ -338,7 +338,7 @@ public partial class ClouseauContext : DbContext
                 .HasConstraintName("FK_feedbackImprovementUser_feedbackUser");
         });
 
-        modelBuilder.Entity<FeedbackItem>(entity =>
+        modelBuilder.Entity<FeedBackItem>(entity =>
         {
             entity.ToTable("feedbackItem");
 
@@ -356,7 +356,7 @@ public partial class ClouseauContext : DbContext
                 .HasConstraintName("FK_feedbackItem_feedbackStandar");
         });
 
-        modelBuilder.Entity<FeedbackPeriod>(entity =>
+        modelBuilder.Entity<FeedBackPeriod>(entity =>
         {
             entity.ToTable("feedbackPeriod");
 
@@ -379,7 +379,7 @@ public partial class ClouseauContext : DbContext
                 .HasConstraintName("FK_feedbackPeriod_feedbackUser");
         });
 
-        modelBuilder.Entity<FeedbackStandar>(entity =>
+        modelBuilder.Entity<FeedBackStandar>(entity =>
         {
             entity.ToTable("feedbackStandar");
 
@@ -393,7 +393,7 @@ public partial class ClouseauContext : DbContext
                 .HasColumnName("name");
         });
 
-        modelBuilder.Entity<FeedbackStandarType>(entity =>
+        modelBuilder.Entity<FeedBackStandarType>(entity =>
         {
             entity.ToTable("feedbackStandarType");
 
@@ -413,7 +413,7 @@ public partial class ClouseauContext : DbContext
                 .HasConstraintName("FK_feedbackStandarType_feedbackStandar");
         });
 
-        modelBuilder.Entity<FeedbackUser>(entity =>
+        modelBuilder.Entity<FeedBackUser>(entity =>
         {
             entity.ToTable("feedbackUser");
 

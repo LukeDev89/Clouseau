@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace DataContext;
 
-public partial class FeedbackComment
+public partial class FeedBackComment
 {
     public long Id { get; set; }
 
@@ -15,7 +15,7 @@ public partial class FeedbackComment
 
     public DateTime Date { get; set; }
 
-    public virtual FeedbackUser FeedbackUser { get; set; } = null!;
+    public virtual FeedBackUser FeedbackUser { get; set; } = null!;
 
     public virtual User User { get; set; } = null!;
 }

@@ -25,8 +25,8 @@ IMPROVEMENT COMPONENTS:
 - ImprovementGrid: Displays improvement data with toggle/delete actions
 
 All components follow the event-based communication pattern where:
-- Form components emit OnSave*/OnCancel* events
-- Grid components emit OnEdit*/OnDelete* events
+- Form components emit OnSave/OnCancel events
+- Grid components emit OnEdit/OnDelete* events
 - Page orchestrators handle all events and coordinate state
 */
 
