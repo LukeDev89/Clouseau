@@ -1,0 +1,76 @@
+﻿@using BlazorBootstrap;
+@using DataService.Auth;
+@using DataService.State;
+@using Website.Client.Pages.SystemManagement.LicenseType
+@using Website.Client.Pages.SystemManagement.NonworkingDays
+@using Website.Client.Pages.SystemManagement.Profiles
+@using Website.Client.Pages.SystemManagement.Roles
+@using Website.Client.Pages.SystemManagement.TaskTypes
+
+@inject AuthService _authService
+@inject ChangedState changedState
+
+@implements IDisposable
+@inject ChangedState changedState
+
+<BlazorBootstrap.Tabs EnableFadeEffect="true" OnShowing="@(args => OnTabShowingAsync(args))">
+
+    @if (_authService.User.ProfileId == (long)DataModel.Enums.ProfileTypes.Administrador)
+    {
+        <BlazorBootstrap.Tab Title="Feriados">
+            <Content>
+                <NonworkingDays />
+            </Content>
+        </BlazorBootstrap.Tab>
+
+        <BlazorBootstrap.Tab Title="Perfiles">
+            <Content>
+                <Profiles />
+            </Content>
+        </BlazorBootstrap.Tab>
+
+        <BlazorBootstrap.Tab Title="Roles">
+            <Content>
+                <Roles />
+            </Content>
+        </BlazorBootstrap.Tab>
+
+        <BlazorBootstrap.Tab Title="Tipo Tareas">
+            <Content>
+                <TaskTypes />
+            </Content>
+        </BlazorBootstrap.Tab>
+
+        <BlazorBootstrap.Tab Title="Tipos de Licencia">
+            <Content>
+                <LicenseTypes />
+            </Content>
+        </BlazorBootstrap.Tab>
+
+    }
+    
+</BlazorBootstrap.Tabs>
+
+<div class="row tabRelleno" style="height:80px">
+    <div class="col-12">
+
+    </div>
+</div> 
+
+@code 
+{
+    protected override void OnInitialized()
+    {
+        changedState.ChangeAction += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        changedState.ChangeAction -= StateHasChanged;
+    }
+
+    private void OnTabShowingAsync(TabsEventArgs args)
+    {
+        changedState.InitChanges();
+    }
+}

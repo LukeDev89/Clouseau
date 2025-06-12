@@ -1,0 +1,261 @@
+﻿@using BlazorBootstrap;
+
+@using DataContext;
+@using DataModel.Enums;
+@using DataService.Auth
+@using DataService.Interfaces.Management;
+@using DataService.State;
+
+@inherits UserAccounts
+
+@inject IUsersAccountService _service
+@inject IUserService _userService
+@inject AuthService authService
+
+@inject ChangedState changedState
+
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleContentAsync">
+            Crear Asociación de Cuenta
+        </Button>
+    </div>
+</div>
+<Collapse @ref="collapseAgregar">
+    <Card>
+        <CardBody>
+            <div class="row">
+                <div class="col-3">
+                    Usuario SWF
+                </div>
+                <div class="col-3">
+                    Servicio
+                </div>
+                <div class="col-3">
+                    Usuario
+                </div>
+                <div class="col-3">
+                    Email
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-3">
+                    <InputSelect class="form-select" @bind-Value="createUserId">
+                        <option selected value=-1 disabled>Seleccione</option>
+                        @foreach (var u in _users)
+                        {
+                            <option value=@u.Id>@u.Username</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-3">
+                    <InputSelect class="form-select" @bind-Value="createServiceId">
+                        <option selected value=-1 disabled>Seleccione</option>
+                        @foreach (AccountType t in Enum.GetValues(typeof(AccountType)))
+                        {
+                            <option value=@((short)t)>@t.ToString()</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-3">
+                    <InputText Class="form-control" @bind-Value="@createUsername"></InputText>
+                </div>
+                <div class="col-3">
+                    <InputText Class="form-control" @bind-Value="@createEmail"></InputText>
+                </div>
+            </div><br />
+            <div class="row">
+                <div class="col-6">
+                </div>
+                <div class="col-6">
+                    <div class="row">
+                        <div class="col-6">
+                        </div>
+                        <div class="col-3">
+                            <Button Class="btn btn-secondary form-control" onclick="@(() => CancelAdd())">
+                                Limpiar
+                            </Button>
+                        </div>
+                        <div class="col-3">
+                            <Button Class="btn btn-primary form-control" onclick="@(() => SaveAdd())">
+                                Crear
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </CardBody>
+    </Card>
+</Collapse>
+
+<br />
+<br />
+
+<Grid TItem="UserAccount" @ref="grid"
+      Class="table table-hover table-bordered table-striped"
+      Data="_accounts"
+      AllowSorting="true"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="8"
+      Responsive="true">
+
+    <GridColumn TItem="UserAccount" HeaderText="Usuario SWF" SortKeySelector="item => item.UserUsername" PropertyName="UserUsername" FilterOperator="FilterOperator.Contains">
+        @context.UserUsername
+    </GridColumn>
+
+    <GridColumn TItem="UserAccount" HeaderText="Servicio" SortKeySelector="item => item.Service" PropertyName="Service" FilterOperator="FilterOperator.Equals">
+        @context.Service.ToString()
+    </GridColumn>
+
+    <GridColumn TItem="UserAccount" HeaderText="Usuario" SortKeySelector="item => item.Username" PropertyName="Username" FilterOperator="FilterOperator.Contains">
+        @context.Username
+    </GridColumn>
+
+    <GridColumn TItem="UserAccount" HeaderText="Email" SortKeySelector="item => item.Email" PropertyName="Email" FilterOperator="FilterOperator.Contains">
+        @context.Email
+    </GridColumn>
+
+    <GridColumn TItem="UserAccount" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="row">
+            <div class="col-12 d-flex">
+                <Button @onclick="async () => await SaveDelete(context.Id)">
+                    <span class="oi oi-circle-x" aria-hidden="true" title="Eliminar" style="color: var(--l-red)"></span>
+                </Button>
+            </div>
+        </div>
+    </GridColumn>
+</Grid>
+
+@code {
+    [Inject] ToastService ToastService { get; set; }
+    private Collapse collapseAgregar;
+    private Grid<UserAccount> grid;
+
+    private long createUserId { get; set; } = -1;
+    private short createServiceId { get; set; } = -1;
+    private string createUsername { get; set; } = "";
+    private string createEmail { get; set; } = "";
+
+    private List<UserAccount> _accounts = new List<UserAccount>();
+    private List<User> _users = new List<User>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetGrid();
+        await base.OnInitializedAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await GetCombo();
+    }
+
+    private async Task GetGrid()
+    {
+        try
+        {
+            _accounts = authService.User.ProfileId == (long)ProfileTypes.Administrador ?
+                            (await _service.GetAsync()) :
+                            (await _service.GetAsync()).Where(x => x.UserId == authService.User.Id).ToList();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task GetCombo()
+    {
+        try
+        {
+            _users = (await _userService.GetAsync()).Where(x => x.IsActive).ToList();
+
+            if (authService.User.ProfileId != (long)ProfileTypes.Administrador)
+            {
+                _users = _users.Where(x => x.Id == authService.User.Id).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveAdd()
+    {
+        try
+        {
+            await _service.AddAsync(createUserId, createUsername, createEmail, (AccountType)createServiceId);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            CancelAdd();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Crear Cuentas de Usuario"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private void CancelAdd()
+    {
+        createUserId = -1;
+        createServiceId = -1;
+        createUsername = "";
+        createEmail = "";
+    }
+
+    private async Task SaveDelete(long Id)
+    {
+        try
+        {
+            await _service.DeleteAsync(Id);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Eliminar Cuentas de Usuario"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
+}

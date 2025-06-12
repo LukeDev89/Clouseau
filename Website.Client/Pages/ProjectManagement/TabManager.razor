@@ -1,0 +1,68 @@
+﻿@using BlazorBootstrap;
+@using DataService.Auth;
+@using DataService.State;
+@using Website.Client.Pages.ProjectManagement.ProjectTasks
+@using Website.Client.Pages.ProjectManagement.Projects
+@using Website.Client.Pages.ProjectManagement.Teams
+@using Website.Client.Pages.ProjectManagement.TeamColaboration
+
+@inject AuthService _authService
+@inject ChangedState changedState
+
+@implements IDisposable
+@inject ChangedState changedState
+
+<BlazorBootstrap.Tabs EnableFadeEffect="true" OnShowing="@(args => OnTabShowingAsync(args))">
+
+    @if (_authService.User.ProfileId == (long)DataModel.Enums.ProfileTypes.Administrador ||
+    _authService.User.ProfileId == (long)DataModel.Enums.ProfileTypes.GestorProyectos)
+    {
+        <BlazorBootstrap.Tab Title="Tareas" IsActive="true">
+            <Content>
+                <ProjectTasks />
+            </Content>
+        </BlazorBootstrap.Tab>
+
+        <BlazorBootstrap.Tab Title="Equipos">
+            <Content>
+                <Teams />
+            </Content>
+        </BlazorBootstrap.Tab>
+
+        <BlazorBootstrap.Tab Title="CECO">
+            <Content>
+                <Projects />
+            </Content>
+        </BlazorBootstrap.Tab>
+
+        <BlazorBootstrap.Tab Title="Colaborador Requiere Gestión">
+            <Content>
+                <TeamColaboration />
+            </Content>
+        </BlazorBootstrap.Tab>
+    }
+</BlazorBootstrap.Tabs>
+
+<div class="row tabRelleno" style="height:80px">
+    <div class="col-12">
+
+    </div>
+</div> 
+
+@code 
+{
+    protected override void OnInitialized()
+    {
+        changedState.ChangeAction += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        changedState.ChangeAction -= StateHasChanged;
+    }
+
+    private void OnTabShowingAsync(TabsEventArgs args)
+    {
+        changedState.InitChanges();
+    }
+}

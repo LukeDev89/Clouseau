@@ -1,0 +1,574 @@
+﻿@using BlazorBootstrap;
+@using DataContext;
+@using DataModel.Enums;
+@using DataService.Auth;
+@using DataService.Interfaces.Management;
+@using DataService.State;
+@using System.Globalization;
+@using System.Text.RegularExpressions;
+
+@inherits RagTemplates
+
+@inject IJSRuntime JSRuntime
+@inject IRagTemplatesService _ragTemplatesService
+@inject IRagFactorService _serviceFactor
+
+@inject AuthService _authService
+
+@inject NavigationManager uriHelper;
+
+@inject ChangedState changedState
+
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleContentAsync">Crear Template</Button>
+    </div>
+</div>
+
+<Collapse @ref="collapseAgregar" Class="custom-container">
+    <Card>
+        <CardBody>
+            <div class="row">
+                <div class="col-6">
+                    Nombre
+                </div>
+                <div class="col-6">
+                    Periodo
+                </div>
+            </div>
+
+            <div class="row mt-2">
+                <div class="col-6">
+                    <InputText Class="form-control" @bind-Value="editRagTemplate.Name"></InputText>
+                </div>
+
+                <div class="col-6">
+                    <InputDate Class="form-control" @bind-Value="editRagTemplate.Period"></InputDate>
+                </div>
+            </div>
+
+            <br />
+            <div class="row">
+                <div class="col-6"></div>
+                <div class="col-6">
+                    <div class="row">
+                        <div class="col-6"></div>
+                        <div class="col-3">
+                            <Button Class="btn form-control" Color="ButtonColor.Secondary" onclick="@(() => CancelAddTask())">
+                                Limpiar
+                            </Button>
+                        </div>
+                        <div class="col-3">
+                            <Button Class="btn form-control" Color="ButtonColor.Primary" onclick="@(() => SaveAddTask())">
+                                Crear
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </CardBody>
+    </Card>
+</Collapse>
+
+<br />
+<br />
+
+
+<Grid TItem="RagTemplate" @ref="grid"
+      Data="_ragTemplate"
+      Class="table table-hover table-bordered table-striped text-nowrap"
+      AllowSorting="true"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="8"
+      Responsive="true"
+      Unit="Unit.Px">
+
+    <GridColumn TItem="RagTemplate" HeaderText="Nombre" FilterOperator="FilterOperator.Contains">
+        @context.Name
+    </GridColumn>
+
+    <GridColumn TItem="RagTemplate" HeaderText="Periodo" FilterOperator="FilterOperator.Equals">
+        @context.Period.ToString("MM/yyyy")
+    </GridColumn>
+
+    <GridColumn TItem="RagTemplate" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="row">
+            <div class="col-8 d-flex justify-content-center">
+                @if (context.Period == _ragTemplate.Max(x => x.Period) && context.RagTemplateFactors.Count > 0)
+                {
+                    <Button @onclick="async () => await SaveExecute(context.Id)">
+                        <span class="oi oi-bolt" aria-hidden="true" title="Ejecutar" style="color: var(--l-yellow)"></span>
+                    </Button>
+                }
+                <Button @onclick="async () => await OnShowModalFactorView(context)">
+                    <span class="oi oi-eye" aria-hidden="true" title="Ver Factores"></span>
+                </Button>
+                @if (context.Period == _ragTemplate.Max(x => x.Period))
+                {
+                    <Button @onclick="async () => await OpenFactorModal(context)">
+                        <span class="oi oi-pencil" aria-hidden="true" title="Editar Factores"></span>
+                    </Button>
+                }
+                <Button @onclick="async () => await SaveDefinitiveDelete(context.Id)">
+                    <span class="oi oi-circle-x" aria-hidden="true" title="Eliminar" style="color: var(--l-red)"></span>
+                </Button>
+            </div>
+        </div>
+    </GridColumn>
+</Grid>
+
+<ConfirmDialog @ref="dialog" />
+
+<Modal @ref="modal" Title=" Rag Template" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h4><b> @modalName</b></h4>
+                <div style="display: none">
+                    @modalId
+                </div>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-12">
+                Agregar Factores
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-9">
+                <InputSelect class="form-select" @bind-Value="addFactorsId">
+                    <option selected value=-1 disabled>Seleccione</option>
+                    @foreach (var f in _factor.Where(f => f.Active && !_templateFactor.Any(m => m.FactorId == f.Id)).OrderBy(x => x.Name))
+                    {
+                        <option value=@f.Id>@f.Name</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-3">
+                <Button Class="btn btn-primary form-control" onclick="@(() => AddFactor())">
+                    Agregar
+                </Button>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-12" style="margin-top: 20px">
+                <h5>Factores agregados</h5>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-12">
+                @if (_templateFactor.Count == 0)
+                {
+                    <div class="row">
+                        <div class="col-12 d-flex align-items-center">
+                            No hay usuarios asignados
+                        </div>
+                    </div>
+                }
+                else if (_templateFactor.Count > 0)
+                    foreach (var u in _templateFactor)
+                    {
+                        <div class="row pt-1">
+                            <div class="col-10 d-flex align-items-center">
+                                @u.Factor.Name
+                            </div>
+                            <div class="col-2 d-flex align-items-center">
+                                <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="@(() => DeleteFactor(u.TemplateId, u.FactorId))">
+                                    <div class="row">
+                                        <div class="col-12 d-flex align-items-center justify-content-center">
+                                            <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-white)"></span>
+                                        </div>
+                                    </div>
+                                </Button>
+                            </div>
+                        </div>
+                    }
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Cerrar</Button>
+        </div>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="async () => await SaveEdit()">Guardar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+<Modal @ref="modalView" Title="Factores Agregados" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h4> <b>@modalName</b> </h4>
+                <div style="display: none">
+                    @modalId
+                </div>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-12">
+                @if (_templateFactor.Count == 0)
+                {
+                    <div class="row">
+                        <div class="col-12 d-flex align-items-center">
+                            No hay templates creados
+                        </div>
+                    </div>
+                }
+                else if (_templateFactor.Count > 0)
+                    foreach (var u in _templateFactor)
+                    {
+                        <div class="row">
+                            <div class="col-6 d-flex align-items-center">
+                                @u.Factor.Name
+                            </div>
+                        </div>
+                    }
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Cerrar</Button>
+        </div>
+
+    </FooterTemplate>
+</Modal>
+
+@code
+{
+    [Inject] ToastService ToastService { get; set; }
+    private ConfirmDialog dialog;
+    private Collapse collapseAgregar;
+    private Grid<RagTemplate> grid;
+    
+    private Modal modal;
+    private Modal modalView;
+
+    private long modalId { get; set; }
+    private string modalName { get; set; }
+    private bool modalActive { get; set; }
+    private long addFactorsId { get; set; } = -1;
+    private RagTemplate editRagTemplate { get; set; } = new RagTemplate() { Period = DateTime.Now };  // ACAAA!! RAG TEMPLATES
+
+
+    private List<RagFactor> _factor = new List<RagFactor>();
+    private List<RagTemplate> _ragTemplate = new List<RagTemplate>();
+    private List<RagTemplateFactor> _templateFactor = new List<RagTemplateFactor>();
+
+
+    private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
+
+    private async Task OnHideModalClick()
+    {
+        modalId = 0;
+        modalName = "";
+        modalActive = false;
+        addFactorsId = -1;
+        _templateFactor = new List<RagTemplateFactor>();
+
+        await modalView?.HideAsync();
+        await modal?.HideAsync();
+    }
+
+    private async Task GetCombos()
+    {
+        try
+        {
+            _factor = await _serviceFactor.GetAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetGrid();
+        await GetCombos();
+        await base.OnInitializedAsync();
+    }
+
+    private async Task GetGrid()
+    {
+        try
+        {
+            _ragTemplate = (await _ragTemplatesService.GetAsync()).OrderByDescending(x => x.Period).ToList();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private void CancelAddTask()
+    {
+        editRagTemplate = new RagTemplate() { Period = DateTime.Now };
+    }
+
+    private async Task SaveAddTask()
+    {
+        try
+        {
+            await _ragTemplatesService.AddAsync(editRagTemplate);
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Template creado con éxito.",
+                    Title = "Crear Template"
+                });
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+
+            changedState.InitChanges();
+
+            CancelAddTask();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveExecute(long templateId)
+    {
+        try
+        {
+            await _ragTemplatesService.Execute(templateId);
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Ejecución de RagStatus con éxito.",
+                    Title = "Crear RagStatus"
+                });
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+
+            changedState.InitChanges();
+
+            CancelAddTask();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task ChangeStateRequest(long id, string name, DateTime period)
+    {
+        try
+        {
+            await _ragTemplatesService.UpdateState(id, name, period);
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Se ha completado acción",
+                    Title = "Cambio de Estado"
+                });
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task OnShowModalFactorView(RagTemplate ragTemplate)
+    {
+        var factores = ragTemplate.RagTemplateFactors.Select(rf => rf.Factor).ToList();
+
+        modalName = ragTemplate.Name;
+        _templateFactor = ragTemplate.RagTemplateFactors.ToList();
+
+        await modalView?.ShowAsync();
+    }
+
+    private async Task OpenFactorModal(RagTemplate ragTemplate)
+    {
+        modalId = ragTemplate.Id;
+        modalName = ragTemplate.Name;
+        _templateFactor = ragTemplate.RagTemplateFactors.ToList();
+
+        await modal?.ShowAsync();
+    }
+
+    private async Task AddFactor()
+    {
+        if (addFactorsId == -1)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Debe seleccionar un Factor",
+                Title = "Error"
+            });
+
+            return;
+        }
+
+        try
+        {
+            await _ragTemplatesService.AddFactorsAsync(modalId, addFactorsId);
+
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Success,
+                Message = $"Acción realizada con éxito.",
+                Title = "Editar Equipos - Asignar Usuario"
+            });
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+
+            addFactorsId = -1;
+
+            _templateFactor = new List<RagTemplateFactor>();
+            _templateFactor = _ragTemplate.First(x => x.Id == modalId).RagTemplateFactors.ToList();
+            _templateFactor = _templateFactor.OrderBy(x => x.Template.Name).ToList();
+
+            StateHasChanged();
+            changedState.InitChanges();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = "Error inesperado al realizar la acción",
+                Title = "Error"
+            });
+        }
+    }
+
+    private async Task DeleteFactor(long id, long factorId)
+    {
+        try
+        {
+            await _ragTemplatesService.DeleteFactorAsync(id, factorId);
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Editar Equipos - quitar Usuario"
+                });
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+
+            _templateFactor = new List<RagTemplateFactor>();
+            _templateFactor = _ragTemplate.First(x => x.Id == id).RagTemplateFactors.ToList();
+
+            StateHasChanged();
+            changedState.InitChanges();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveEdit()
+    {
+        try
+        {
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            await OnHideModalClick();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Editar Equipo"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await GetCombos();
+    }
+
+    private async Task SaveDefinitiveDelete(long Id)
+    {
+        try
+        {
+            await _ragTemplatesService.DefinitiveDeleteAsync(Id);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            await OnHideModalClick();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Eliminar Equipo"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Revise si el equipo tiene usuarios asignados, desasignelos y vuelva a intentar.",
+                    Title = "Error"
+                });
+        }
+    }
+
+}
+
+

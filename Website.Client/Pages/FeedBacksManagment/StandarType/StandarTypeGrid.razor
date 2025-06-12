@@ -1,0 +1,473 @@
+﻿@using BlazorBootstrap
+@using DataContext
+@using DataModel.Enums
+@using DataService.Auth;
+@using DataService.Interfaces.Management;
+@using DataService.Interfaces.ProjectManagement
+@using DataService.State;
+
+@inherits StandarType
+
+@inject IFeedBackStandarTypeService _standarTypeService
+@inject IFeedBackStandarService _serviceStandar
+
+
+@inject ChangedState changedState
+
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleContentAsync">
+            Crear Criterio
+        </Button>
+    </div>
+</div>
+<Collapse @ref="collapseAgregar">
+    <Card>
+        <CardBody>
+            <div class="mt-2">
+                <div class="col-3">
+                    <label for="categoriaSelect" class="form-label">Categoría</label>
+                    <InputSelect id="categoriaSelect" class="form-select" @bind-Value="createStandarType.FeedbackStandarId">
+                        <option selected value="-1" disabled="@createStandarType.FeedbackStandarId != -1">Seleccione</option>
+                        @foreach (var p in _standars)
+                        {
+                            <option value="@p.Id">@p.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+            </div>
+
+            <div class="mt-2">
+                <div class="col-3">
+                    <label for="puntajeSelect" class="form-label">Puntaje</label>
+                    <InputSelect id="puntajeSelect" class="form-select" @bind-Value="selectedFeedbackStatus">
+                        <option value="-1" disabled="@selectedFeedbackStatus != -1">Seleccione</option>
+                        @foreach (var status in Enum.GetValues(typeof(FeedbackStatus)).Cast<FeedbackStatus>())
+                        {
+                            <option value="@status">@status</option>
+                        }
+                    </InputSelect>
+                </div>
+            </div>
+
+            <div class="mt-2">
+                <label for="descripcionText" class="form-label">Descripción</label>
+                <div class="col-12">
+                    <textarea id="descripcionText" class="form-control" @bind="@createStandarType.Description" rows="4"></textarea>
+                </div>
+            </div>
+
+
+            <div class="row mt-4">
+                <div class="col-6">
+                </div>
+                <div class="col-6">
+                    <div class="row">
+                        <div class="col-6"></div>
+                        <div class="col-3">
+                            <Button Class="btn btn-secondary form-control" onclick="@(() => CancelAdd())">
+                                Limpiar
+                            </Button>
+                        </div>
+                        <div class="col-3">
+                            <Button Class="btn btn-primary form-control" onclick="@(() => SaveAdd())">
+                                Crear
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </CardBody>
+    </Card>
+
+</Collapse>
+
+<br />
+<br />
+
+<Grid TItem="FeedbackStandarType" @ref="grid"
+Data="_standarType"
+Class="table table-hover table-bordered table-striped"
+AllowSorting="true"
+AllowFiltering="true"
+AllowPaging="true"
+PageSize="40"
+Responsive="true">
+
+    <GridColumn TItem="FeedbackStandarType" HeaderText="Categoría" SortKeySelector="item => item.FeedbackStandar.Name" PropertyName="Standar" FilterOperator="FilterOperator.Contains">
+        @context.FeedbackStandar.Name
+    </GridColumn>
+
+    <GridColumn TItem="FeedbackStandarType" HeaderText="Estado" SortKeySelector="item => item.Name" PropertyName="Status" FilterOperator="FilterOperator.Contains">
+        @context.Name
+    </GridColumn>
+
+    <GridColumn TItem="FeedbackStandarType" HeaderText="Descripción" SortKeySelector="item => item.Description" PropertyName="Descripción" FilterOperator="FilterOperator.Contains">
+        @context.Description
+    </GridColumn>
+
+    <GridColumn TItem="FeedbackStandarType" HeaderText="Activo" Sortable="false" Filterable="false">
+        <div style="text-align: center;">
+            @if (context.Active.HasValue && context.Active.Value)
+            {
+                <span class="oi oi-circle-check" aria-hidden="true" style="color: var(--l-green)"></span>
+            }
+            else
+            {
+                <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-red)"></span>
+            }
+        </div>
+    </GridColumn>
+
+    <GridColumn TItem="FeedbackStandarType" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="text-center">
+            <div class="d-inline-flex">
+                <Button @onclick="async () => await OnShowModalClick(context)">
+                    <span class="oi oi-pencil" aria-hidden="true" title="Editar"></span>
+                </Button>
+
+                <Button @onclick="async () => await ToggleActiveAsync(context)">
+                    @if (context != null && context.Active.HasValue)
+                    {
+                        if (context.Active.Value)
+                        {
+                            <span class="oi oi-circle-x" style="color: var(--l-red)" aria-hidden="true" title="Inhabilitar"></span>
+                        }
+                        else
+                        {
+                            <span class="oi oi-circle-check" style="color: var(--l-green)" aria-hidden="true" title="Habilitar"></span>
+                        }
+                    }
+                </Button>
+
+                <Button @onclick="async () => await SaveDefinitiveDelete(context.Id)">
+                    <span class="oi oi-trash" aria-hidden="true" title="Eliminar"></span>
+                </Button>
+            </div>
+        </div>
+    </GridColumn>
+</Grid>
+
+<Modal @ref="modal" Title="Editar CECO" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h5><b>@editStandarType.Name</b></h5>
+                <div style="display: none">
+                    @editStandarType.Id
+                </div>
+            </div>
+        </div>
+
+
+        <div class="row align-items-center mt-2">
+            <div class="col-2">
+                <label for="categoriaSelect" class="form-label">Categoría</label>
+            </div>
+            <div class="col-10">
+                <InputSelect id="categoriaSelect" class="form-select" @bind-Value="editStandarType.FeedbackStandarId">
+                    <option selected value="-1" disabled>Seleccione</option>
+                    @foreach (var p in _standars)
+                    {
+                        <option value="@p.Id">@p.Name</option>
+                    }
+                </InputSelect>
+            </div>
+        </div>
+
+
+        <div class="row align-items-center mt-2">
+            <div class="col-2">
+                Nombre
+            </div>
+            <div class="col-10">
+                <InputText Class="form-control" @bind-Value="@editStandarType.Name" disabled></InputText>
+            </div>
+        </div>
+
+        <div class="row align-items-center mt-2">
+            <div class="col-2 mt-4">
+                Descripción
+            </div>
+            <div class="col-10">
+                <textarea Class="form-control" @bind="editStandarType.Description" rows="6"></textarea>
+            </div>
+        </div>
+
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Cerrar</Button>
+        </div>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="SaveEdit">Guardar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+@code {
+    [Inject] private ToastService ToastService { get; set; }
+    [Inject] private PreloadService PreloadService { get; set; }
+
+    private Collapse collapseAgregar;
+    private Grid<FeedbackStandarType> grid;
+
+    private Modal modal;
+
+    private FeedbackStandarType editStandarType { get; set; } = new FeedbackStandarType();
+    private FeedbackStandarType createStandarType { get; set; } = new FeedbackStandarType() { FeedbackStandarId = -1 };
+
+    private List<FeedbackStandarType> _standarType = new List<FeedbackStandarType>();
+    private List<FeedbackStandar> _standars = new List<FeedbackStandar>();
+    private List<Team> _teams = new List<Team>();
+
+    private FeedbackStatus selectedFeedbackStatus { get; set; } = FeedbackStatus.Deficiente;
+
+    protected override async Task OnInitializedAsync()
+    {
+        changedState.ChangeAction += StateHasChanged;
+
+        try
+        {
+            PreloadService.Show();
+
+            await GetGrid();
+            await GetCombo();
+        }
+        catch (Exception e)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+        finally
+        {
+            PreloadService.Hide();
+        }
+
+        await base.OnInitializedAsync();
+    }
+
+    public void Dispose()
+    {
+        changedState.ChangeAction -= StateHasChanged;
+    }
+
+    private async Task GetGrid()
+    {
+        _standarType = await _standarTypeService.GetAsync();
+    }
+
+    private async Task GetCombo()
+    {
+        _standars = (await _serviceStandar.GetAsync()).Where(x => x.Active == true).ToList();
+    }
+
+    private async Task SaveAdd()
+    {
+        try
+        {         
+            if ((int)(object)selectedFeedbackStatus == -1) 
+            {
+                ToastService.Notify(new ToastMessage()
+                    {
+                        Type = ToastType.Warning,
+                        Message = "Seleccione un Puntaje válido",
+                        Title = "Alerta"
+                    });
+                return; 
+            }
+
+            createStandarType.Name = selectedFeedbackStatus.ToString();
+            await _standarTypeService.AddAsync(createStandarType);
+            await GetGrid();
+            await grid.RefreshDataAsync();
+
+            changedState.InitChanges();
+
+            CancelAdd();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con éxito",
+                    Title = "Agregar Mejora"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+
+
+    private void CancelAdd()
+    {
+        createStandarType.Name = "";
+        createStandarType.Description = "";
+        createStandarType.Active = true;
+        createStandarType.FeedbackStandarId = -1;       
+    }
+
+    private async Task SaveEdit()
+    {
+        try
+        {
+            await _standarTypeService.EditAsync(editStandarType);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            await OnHideModalClick();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con exito",
+                    Title = "Editar Mejora"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveDelete(long Id)
+    {
+        try
+        {
+            await _standarTypeService.DeleteAsync(Id);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            await OnHideModalClick();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con exito",
+                    Title = "Eliminar Mejora"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task OnShowModalClick(FeedbackStandarType standarType)
+    {
+        editStandarType = standarType;
+
+        await modal?.ShowAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        editStandarType.Id = 0;
+        editStandarType.Name = "";
+        editStandarType.Description = "";
+        editStandarType.FeedbackStandarId = -1;
+
+        await modal?.HideAsync();
+    }
+
+    private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
+
+    private async Task ToggleActiveAsync(FeedbackStandarType feedbackStandarType)
+    {
+        if (feedbackStandarType == null) return;
+
+        feedbackStandarType.Active = !(feedbackStandarType.Active.HasValue && feedbackStandarType.Active.Value);
+
+        try
+        {
+            await _standarTypeService.EditAsync(feedbackStandarType);
+
+            var action = feedbackStandarType.Active.Value ? "Activo" : "Inactivo";
+            ToastService.Notify(new ToastMessage
+                {
+                    Type = ToastType.Success,
+                    Message = $"El periodo se encuentra {action}.",
+                    Title = "Estado Actualizado"
+                });
+
+            StateHasChanged();
+
+            // await GetGrid();
+            await UpdateFeedbackUser();
+            // await grid.RefreshDataAsync();
+            // changedState.InitChanges();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task UpdateFeedbackUser()
+    {
+        _standarType = await _standarTypeService.GetAsync();
+    }
+
+    private async Task SaveDefinitiveDelete(long Id)
+    {
+        try
+        {
+            await _standarTypeService.DefinitiveDeleteAsync(Id);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            await OnHideModalClick();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Eliminar Tipo de Standar "
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error al borrar Tipo de Standar ",
+                    Title = "Error"
+                });
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        createStandarType.FeedbackStandarId = -1;
+        selectedFeedbackStatus = (FeedbackStatus)(-1);
+    }
+
+}

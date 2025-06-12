@@ -1,0 +1,617 @@
+﻿@using BlazorBootstrap
+@using DataContext
+@using DataModel.Dto;
+@using DataModel.Request;
+@using DataService.Auth;
+@using DataService.Interfaces.GadgetExpress
+@using DataService.Interfaces.Management;
+@using System.Globalization;
+@using DataService.Interfaces.ProjectManagement;
+
+@inherits CommunicationManager
+
+@inject IGadgetExpressService _gadgetExpressService
+@inject IRoleService _roleService
+@inject ITeamService _teamService
+
+@inject AuthService _authService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+@inject NavigationManager navigationManager;
+
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleContentAsync">
+            Crear Notificación
+        </Button>
+    </div>
+</div>
+<Collapse @ref="collapseAgregar">
+    <Card>
+        <CardBody>
+            <div class="row">
+                <div class="col-3">
+                    Título
+                </div>
+                <div class="col-9">
+                    Mensaje
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-3">
+                    <InputText Class="form-control" @bind-Value="@newGadget.Title"></InputText>
+                </div>
+                <div class="col-9">
+                    <InputText Class="form-control" @bind-Value="@newGadget.Message"></InputText>
+                </div>
+            </div>
+            <div class="row mt-4">
+                <div class="col-12">
+                    Descripción
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-12">
+                    <InputText Class="form-control" @bind-Value="@newGadget.Description"></InputText>
+                </div>
+            </div>
+            <div class="row mt-4">
+                <div class="col-3">
+                    Fecha Inicio
+                </div>
+                <div class="col-3">
+                    Hora Inicio
+                </div>
+                <div class="col-3">
+                    Fecha Fin
+                </div>
+                <div class="col-3">
+                    Hora Fin
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-3">
+                    <DateInput Class="form-control" @bind-Value="@newGadget.StartDay"></DateInput>
+                </div>
+                <div class="col-3">
+                    <TimeInput Class="form-control" @bind-Value="@newStartTime"></TimeInput>
+                </div>
+                <div class="col-3">
+                    <DateInput Class="form-control" @bind-Value="@newGadget.EndDay"></DateInput>
+                </div>
+                <div class="col-3">
+                    <TimeInput Class="form-control" @bind-Value="@newEndTime"></TimeInput>
+                </div>
+            </div>
+            <div class="row mt-4">
+                <div class="col-3">
+                    Intervalo Hs
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-3">
+                    <InputNumber Class="form-control" @bind-Value="@newGadget.IntervalHours"></InputNumber>
+                </div>
+            </div>
+            <div class="row mt-4">
+                <div class="col-2">
+                    <div class="form-check">
+                        <InputCheckbox Class="form-check-input" id="chkMonday" @bind-Value="@newGadget.ActiveMonday"></InputCheckbox>
+                        <label class="form-check-label" for="flexCheckDefault">
+                            Lunes
+                        </label>
+                    </div>
+                </div>
+                <div class="col-2">
+                    <div class="form-check">
+                        <InputCheckbox Class="form-check-input" id="chkTuesday" @bind-Value="@newGadget.ActiveTuesday"></InputCheckbox>
+                        <label class="form-check-label" for="flexCheckDefault">
+                            Martes
+                        </label>
+                    </div>
+                </div>
+                <div class="col-2">
+                    <div class="form-check">
+                        <InputCheckbox Class="form-check-input" id="chkWednesday" @bind-Value="@newGadget.ActiveWednesday"></InputCheckbox>
+                        <label class="form-check-label" for="flexCheckDefault">
+                            Miercoles
+                        </label>
+                    </div>
+                </div>
+                <div class="col-2">
+                    <div class="form-check">
+                        <InputCheckbox Class="form-check-input" id="chkThursday" @bind-Value="@newGadget.ActiveThursday"></InputCheckbox>
+                        <label class="form-check-label" for="flexCheckDefault">
+                            Jueves
+                        </label>
+                    </div>
+                </div>
+                <div class="col-2">
+                    <div class="form-check">
+                        <InputCheckbox Class="form-check-input" id="chkFriday" @bind-Value="@newGadget.ActiveFriday"></InputCheckbox>
+                        <label class="form-check-label" for="flexCheckDefault">
+                            Viernes
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="row mt-4">
+                <div class="col-8"></div>
+                <div class="col-4">
+                    <div class="row">
+                        <div class="col-6">
+                            <Button Class="btn btn-secondary form-control" @onclick="async () => await CancelAdd()">
+                                Limpiar
+                            </Button>
+                        </div>
+                        <div class="col-6">
+                            <Button Class="btn btn-primary form-control" @onclick="async () => await CreateNotification()">
+                                Crear
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </CardBody>
+    </Card>
+</Collapse>
+
+<br />
+<br />
+
+<Grid TItem="GadgetExpress" @ref="grid"
+      Data="_gadgetExpress"
+      Class="table table-hover table-bordered table-striped text-nowrap"
+      AllowSorting="true"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="8"
+      Responsive="true"
+      Unit="Unit.Px">
+
+    <GridColumn TItem="GadgetExpress" FilterTextboxWidth="150" HeaderText="Título" Freeze="true" FreezeLeftPosition="0" TextNoWrap="true" SortKeySelector="item => item.Title" PropertyName="Title" FilterOperator="FilterOperator.Contains">
+        @context.Title
+    </GridColumn>
+
+    <GridColumn TItem="GadgetExpress" HeaderText="Descripción" Sortable="false" Filterable="false">
+        @context.Description
+    </GridColumn>
+
+    <GridColumn TItem="GadgetExpress" HeaderText="Mensaje" Sortable="false" Filterable="false">
+        @context.Message
+    </GridColumn>
+
+    <GridColumn TItem="GadgetExpress" HeaderText="Día Inicio" SortKeySelector="item => item._StartDay" PropertyName="_StartDay" FilterOperator="FilterOperator.Equals">
+        @context._StartDay.ToString("dd/MM/yyyy")
+    </GridColumn>
+
+    <GridColumn TItem="GadgetExpress" HeaderText="Hora Inicio" Sortable="false" Filterable="false">
+        @context._StartTime.ToString("hh:mm")
+    </GridColumn>
+
+    <GridColumn TItem="GadgetExpress" HeaderText="Día Fin" Sortable="false" Filterable="false">
+        @context._EndDay?.ToString("dd/MM/yyyy")
+    </GridColumn>
+
+    <GridColumn TItem="GadgetExpress" HeaderText="Hora Fin" Sortable="false" Filterable="false">
+        @context._EndTime?.ToString("hh:mm")
+    </GridColumn>
+
+    <GridColumn TItem="GadgetExpress" HeaderText="Intervalo hs" TextAlignment="Alignment.End" Sortable="false" Filterable="false">
+        @context.IntervalHours
+    </GridColumn>
+
+    <GridColumn TItem="GadgetExpress" HeaderText="Ejecuciones" TextAlignment="Alignment.End" Sortable="false" Filterable="false">
+        @context.Executions
+    </GridColumn>
+
+    <GridColumn TItem="GadgetExpress" HeaderText="Lunes" SortKeySelector="item => item.ActiveMonday" PropertyName="ActiveMonday" FilterOperator="FilterOperator.Equals">
+        @if (context.ActiveMonday)
+        {
+            <span class="oi oi-circle-check" aria-hidden="true" style="color: var(--l-green)"></span>
+        }
+        else
+        {
+            <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-red)"></span>
+        }
+    </GridColumn>
+
+    <GridColumn TItem="GadgetExpress" HeaderText="Martes" SortKeySelector="item => item.ActiveTuesday" PropertyName="ActiveTuesday" FilterOperator="FilterOperator.Equals">
+        @if (context.ActiveTuesday)
+        {
+            <span class="oi oi-circle-check" aria-hidden="true" style="color: var(--l-green)"></span>
+        }
+        else
+        {
+            <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-red)"></span>
+        }
+    </GridColumn>
+
+    <GridColumn TItem="GadgetExpress" HeaderText="Miércoles" SortKeySelector="item => item.ActiveWednesday" PropertyName="ActiveWednesday" FilterOperator="FilterOperator.Equals">
+        @if (context.ActiveWednesday)
+        {
+            <span class="oi oi-circle-check" aria-hidden="true" style="color: var(--l-green)"></span>
+        }
+        else
+        {
+            <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-red)"></span>
+        }
+    </GridColumn>
+
+    <GridColumn TItem="GadgetExpress" HeaderText="Jueves" SortKeySelector="item => item.ActiveThursday" PropertyName="ActiveThursday" FilterOperator="FilterOperator.Equals">
+        @if (context.ActiveThursday)
+        {
+            <span class="oi oi-circle-check" aria-hidden="true" style="color: var(--l-green)"></span>
+        }
+        else
+        {
+            <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-red)"></span>
+        }
+    </GridColumn>
+
+    <GridColumn TItem="GadgetExpress" HeaderText="Viernes" SortKeySelector="item => item.ActiveFriday" PropertyName="ActiveFriday" FilterOperator="FilterOperator.Equals">
+        @if (context.ActiveFriday)
+        {
+            <span class="oi oi-circle-check" aria-hidden="true" style="color: var(--l-green)"></span>
+        }
+        else
+        {
+            <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-red)"></span>
+        }
+    </GridColumn>
+
+    <GridColumn TItem="GadgetExpress" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="row">
+            <div class="col-12 d-flex">
+                <Button @onclick="async () => await OnShowModalClick(context)">
+                    <span class="oi oi-pencil" aria-hidden="true" title="Editar"></span>
+                </Button>
+
+                <Button @onclick="async () => await OnForceSend(context)">
+                    <span class="oi oi-bolt" style="color: var(--l-yellow)" aria-hidden="true" title="Forzar Envio"></span>
+                </Button>
+
+                <Button @onclick="async () => await OnDesactiveNotification(context)">
+                    <span class="oi oi-circle-x" style="color: var(--l-red)" aria-hidden="true" title="Desactivar"></span>
+                </Button>
+            </div>
+        </div>
+    </GridColumn>
+</Grid>
+
+<Modal @ref="modal" Title="Editar Mensaje" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h4><b>@modalGadget.Title</b></h4>
+            </div>
+        </div>
+        <div class="row mt-4">
+            <div class="col-3">
+                Título
+            </div>
+            <div class="col-9">
+                Mensaje
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-3">
+                <InputText Class="form-control" @bind-Value="@modalGadget.Title"></InputText>
+            </div>
+            <div class="col-9">
+                <InputText Class="form-control" @bind-Value="@modalGadget.Message"></InputText>
+            </div>
+        </div>
+        <div class="row mt-4">
+            <div class="col-12">
+                Descripción
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-12">
+                <InputText Class="form-control" @bind-Value="@modalGadget.Description"></InputText>
+            </div>
+        </div>
+        <div class="row mt-4">
+            <div class="col-3">
+                Fecha Inicio
+            </div>
+            <div class="col-3">
+                Hora Inicio
+            </div>
+            <div class="col-3">
+                Fecha Fin
+            </div>
+            <div class="col-3">
+                Hora Fin
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-3">
+                <DateInput Class="form-control" @bind-Value="@modalGadget.StartDay"></DateInput>
+            </div>
+            <div class="col-3">
+                <TimeInput Class="form-control" @bind-Value="@newStartTime"></TimeInput>
+            </div>
+            <div class="col-3">
+                <DateInput Class="form-control" @bind-Value="@modalGadget.EndDay"></DateInput>
+            </div>
+            <div class="col-3">
+                <TimeInput Class="form-control" @bind-Value="@newEndTime"></TimeInput>
+            </div>
+        </div>
+        <div class="row mt-4">
+            <div class="col-3">
+                Intervalo Hs
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-3">
+                <InputNumber Class="form-control" @bind-Value="@modalGadget.IntervalHours"></InputNumber>
+            </div>
+        </div>
+        <div class="row mt-4">
+            <div class="col-2">
+                <div class="form-check">
+                    <InputCheckbox Class="form-check-input" id="chkMonday" @bind-Value="@modalGadget.ActiveMonday"></InputCheckbox>
+                    <label class="form-check-label" for="flexCheckDefault">
+                        Lunes
+                    </label>
+                </div>
+            </div>
+            <div class="col-2">
+                <div class="form-check">
+                    <InputCheckbox Class="form-check-input" id="chkTuesday" @bind-Value="@modalGadget.ActiveTuesday"></InputCheckbox>
+                    <label class="form-check-label" for="flexCheckDefault">
+                        Martes
+                    </label>
+                </div>
+            </div>
+            <div class="col-2">
+                <div class="form-check">
+                    <InputCheckbox Class="form-check-input" id="chkWednesday" @bind-Value="@modalGadget.ActiveWednesday"></InputCheckbox>
+                    <label class="form-check-label" for="flexCheckDefault">
+                        Miercoles
+                    </label>
+                </div>
+            </div>
+            <div class="col-2">
+                <div class="form-check">
+                    <InputCheckbox Class="form-check-input" id="chkThursday" @bind-Value="@modalGadget.ActiveThursday"></InputCheckbox>
+                    <label class="form-check-label" for="flexCheckDefault">
+                        Jueves
+                    </label>
+                </div>
+            </div>
+            <div class="col-2">
+                <div class="form-check">
+                    <InputCheckbox Class="form-check-input" id="chkFriday" @bind-Value="@modalGadget.ActiveFriday"></InputCheckbox>
+                    <label class="form-check-label" for="flexCheckDefault">
+                        Viernes
+                    </label>
+                </div>
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Limpiar</Button>
+        </div>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="SaveModal">Guardar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+@code {
+    [Inject] ToastService ToastService { get; set; }
+    [Inject] protected PreloadService PreloadService { get; set; }
+
+    private Modal modal;
+    private Grid<GadgetExpress> grid;
+    private Collapse collapseAgregar;
+
+    private List<GadgetExpress> _gadgetExpress = new List<GadgetExpress>();
+    private List<Role> _roles = new List<Role>();
+    private List<Team> _teams = new List<Team>();
+
+    private GadgetExpress modalGadget { get; set; }
+    private GadgetExpress newGadget { get; set; } = new GadgetExpress();
+    private TimeOnly newStartTime { get; set; }
+    private TimeOnly? newEndTime { get; set; }
+
+    private int newTeamId { get; set; } = -1;
+    private int newRoleId { get; set; } = -1;
+
+    public DateTime modalDate { get; set; } = DateTime.Now;
+    public DateTime? modalDateTo { get; set; } = null;
+    public decimal modalHours { get; set; }
+
+    private bool _errorOccurred = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (_errorOccurred)
+            {
+                await localStorage.ClearAsync();
+
+                ToastService.Notify(new ToastMessage()
+                    {
+                        Type = ToastType.Danger,
+                        Message = "Error inesperado al realizar la acción",
+                        Title = "Error"
+                    });
+
+                navigationManager.NavigateTo("/");
+
+            }
+            else
+            {
+                if (!_authService.IsLoggedIn)
+                {
+                    navigationManager.NavigateTo("/");
+                }
+                else
+                {
+                    var uri = navigationManager.Uri;
+                    await localStorage.SetItemAsync("lastUrl", uri);
+                    await localStorage.SetItemAsync("huboRecarga", false);
+                }
+            }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            PreloadService.Show();
+            await GetGrid();
+            await base.OnInitializedAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorOccurred = true;
+        }
+        finally
+        {
+            PreloadService.Hide();
+        }
+    }
+
+    private async Task GetGrid()
+    {
+        try
+        {
+            _gadgetExpress = await _gadgetExpressService.GetAll();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task OnForceSend(GadgetExpress model)
+    {
+        await _gadgetExpressService.Send(model);
+
+        ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Success,
+                Message = "Notificación enviada con éxito",
+                Title = "Notificación"
+            });
+    }
+
+    private async Task OnDesactiveNotification(GadgetExpress model)
+    {
+        model.ActiveMonday = false;
+        model.ActiveTuesday = false;
+        model.ActiveWednesday = false;
+        model.ActiveThursday = false;
+        model.ActiveFriday = false;
+
+        await _gadgetExpressService.Update(model);
+
+        ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Success,
+                Message = "Notificación desactivada con éxito",
+                Title = "Notificación"
+            });
+
+        await GetGrid();
+        await grid.RefreshDataAsync();
+    }
+
+    private async Task SaveModal()
+    {
+        try
+        {
+            await _gadgetExpressService.Update(modalGadget);
+
+            await OnHideModalClick();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Horas cargadas con éxito.",
+                    Title = "Regisro de Horas"
+                });
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task OnShowModalClick(GadgetExpress model)
+    {
+        modalGadget = model;
+
+        await modal?.ShowAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        modalGadget = new GadgetExpress();
+
+        await modal?.HideAsync();
+    }
+
+    private async Task CreateNotification()
+    {
+        try
+        {
+            newGadget.StartTime = newStartTime.ToTimeSpan();
+            newGadget.EndTime = newEndTime?.ToTimeSpan();
+
+            await _gadgetExpressService.Add(newGadget);
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Notificación creada con éxito",
+                    Title = "Notificación"
+                });
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task CancelAdd()
+    {
+        newGadget = new GadgetExpress();
+        newStartTime = new TimeOnly();
+        newEndTime = new TimeOnly();
+    }
+
+    private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
+}

@@ -1,0 +1,427 @@
+﻿@using BlazorBootstrap
+@using DataContext
+@using DataModel.Enums
+@using DataService.Auth;
+@using DataService.Interfaces.Management;
+@using DataService.Interfaces.ProjectManagement
+@using DataService.State;
+
+@inherits Item
+
+@inject IFeedBackItemService _itemService
+@inject IFeedBackImprovementService _improvementService
+@inject IFeedBackStandarService _standarsService
+
+
+@inject ChangedState changedState
+
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleContentAsync">
+            Crear Punto de Evaluación
+        </Button>
+    </div>
+</div>
+<Collapse @ref="collapseAgregar">
+    <Card>
+        <CardBody>
+            <div class="row">
+                <div class="col-4">
+                    <span class="text-nowrap">Nombre</span>
+                </div>
+                <div class="col-8">
+                    <span class="text-nowrap">Categoría</span>
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-4">
+                    <InputText Class="form-control" @bind-Value="@createItem.Name"></InputText>
+                </div>
+                <div class="col-8">
+                    <InputSelect class="form-select" @bind-Value="createItem.FeedbackStandarId">
+                        <option selected value=-1 disabled>Seleccione</option>
+                        @foreach (var p in _standars)
+                        {
+                            <option value="@p.Id">@p.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+            </div>
+            <div class="row mt-4">
+                <div class="col-6">
+                </div>
+                <div class="col-6">
+                    <div class="row">
+                        <div class="col-6"></div>
+                        <div class="col-3">
+                            <Button Class="btn btn-secondary form-control" onclick="@(() => CancelAdd())">
+                                Limpiar
+                            </Button>
+                        </div>
+                        <div class="col-3">
+                            <Button Class="btn btn-primary form-control" onclick="@(() => SaveAdd())">
+                                Crear
+                            </Button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </CardBody>
+    </Card>
+</Collapse>
+
+<br />
+<br />
+
+<Grid TItem="FeedbackItem" @ref="grid"
+      Data="_items"
+      Class="table table-hover table-bordered table-striped"
+      AllowSorting="true"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="30"
+      Responsive="true">
+
+    <GridColumn TItem="FeedbackItem" HeaderText="Nombre" SortKeySelector="item => item.Name" PropertyName="Name" FilterOperator="FilterOperator.Contains">
+        @context.Name
+    </GridColumn>
+
+    <GridColumn TItem="FeedbackItem" HeaderText="Categoría" SortKeySelector="item => item.FeedbackStandarId" PropertyName="Name" FilterOperator="FilterOperator.Contains">
+        @context.StandarName
+    </GridColumn>
+
+    <GridColumn TItem="FeedbackItem" HeaderText="Activo" Sortable="false" Filterable="false">
+        <div style="text-align: center;">
+            @if (context.Active.HasValue && context.Active.Value)
+            {
+                <span class="oi oi-circle-check" aria-hidden="true" style="color: var(--l-green)"></span>
+            }
+            else
+            {
+                <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-red)"></span>
+            }
+        </div>
+    </GridColumn>
+
+    <GridColumn TItem="FeedbackItem" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="text-center">
+            <div class="d-inline-flex">
+                <Button @onclick="async () => await OnShowModalClick(context)">
+                    <span class="oi oi-pencil" aria-hidden="true" title="Editar"></span>
+                </Button>
+
+
+                <Button @onclick="async () => await ToggleActiveAsync(context)">
+                    @if (context != null && context.Active.HasValue)
+                    {
+                        if (context.Active.Value)
+                        {
+                            <span class="oi oi-circle-x" style="color: var(--l-red)" aria-hidden="true" title="Inhabilitar"></span>
+                        }
+                        else
+                        {
+                            <span class="oi oi-circle-check" style="color: var(--l-green)" aria-hidden="true" title="Habilitar"></span>
+                        }
+                    }
+                </Button>
+
+                <Button @onclick="async () => await SaveDefinitiveDelete(context.Id)">
+                    <span class="oi oi-trash" aria-hidden="true" title="Eliminar" style="color: var(--l-white)"></span>
+                </Button>
+            </div>
+        </div>
+    </GridColumn>
+</Grid>
+
+<Modal @ref="modal" Title="Editar Item" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h5><b>@editItem.Name</b></h5>
+                <div style="display: none">
+                    @editItem.Id
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-2">
+            <div class="col-2">
+                Nombre
+            </div>
+            <div class="col-10 ">
+                <InputText Class="form-control" @bind-Value="@editItem.Name"></InputText>
+            </div>
+        </div>
+
+        <div class="row mt-2">
+            <div class="col-2">
+                Categoría
+            </div>
+            <div class="col-10">
+                <InputSelect class="form-select" @bind-Value="editItem.FeedbackStandarId">
+                    <option selected value=-1 disabled>Seleccione</option>
+                    @foreach (var p in _standars)
+                    {
+                        <option value=@p.Id>@p.Name</option>
+                    }
+                </InputSelect>
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Cerrar</Button>
+        </div>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="SaveEdit">Guardar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+@code {
+    [Inject] private ToastService ToastService { get; set; }
+    [Inject] private PreloadService PreloadService { get; set; }
+
+    private Collapse collapseAgregar;
+    private Grid<FeedbackItem> grid;
+
+    private Modal modal;
+
+    private FeedbackItem editItem { get; set; } = new FeedbackItem();
+    private FeedbackItem createItem { get; set; } = new FeedbackItem();
+
+    private FeedbackStandar editStandar { get; set; } = new FeedbackStandar();
+
+
+    private List<FeedbackItem> _items = new List<FeedbackItem>();
+    private List<FeedbackStandar> _standars = new List<FeedbackStandar>();
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        changedState.ChangeAction += StateHasChanged;
+
+        try
+        {
+            PreloadService.Show();
+
+            await GetGrid();
+            await GetCombo();
+        }
+        catch (Exception e)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+        finally
+        {
+            PreloadService.Hide();
+        }
+
+        await base.OnInitializedAsync();
+    }
+
+    public void Dispose() // nuevo
+    {
+        changedState.ChangeAction -= StateHasChanged;
+    }
+
+    private async Task GetGrid()
+    {
+        _items = await _itemService.GetAsync();
+    }
+
+    private async Task SaveAdd()
+    {
+        try
+        {
+            createItem.Active = true;
+            await _itemService.AddAsync(createItem);
+            createItem = new FeedbackItem();
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+
+            changedState.InitChanges();
+
+            CancelAdd();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con éxito",
+                    Title = "Agregar Item"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private void CancelAdd()
+    {
+        createItem.Name = "";
+        createItem.FeedbackStandarId = -1;
+        createItem.Active = false;
+    }
+
+    private async Task GetCombo()
+    {
+        _standars = (await _standarsService.GetAsync()).Where(x => x.Active == true).ToList();
+    }
+
+    private async Task SaveEdit()
+    {
+        try
+        {
+            await _itemService.EditAsync(editItem);
+
+            StateHasChanged();
+
+            await grid.RefreshDataAsync();
+            await GetGrid();
+            await OnHideModalClick();
+
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con exito",
+                    Title = "Editar Item"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveDelete(long Id)
+    {
+        try
+        {
+            await _itemService.DeleteAsync(Id);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            await OnHideModalClick();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con exito",
+                    Title = "Eliminar Mejora"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task OnShowModalClick(FeedbackItem item)
+    {
+        editItem = item;
+        await modal?.ShowAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        editItem.Active = default;
+        await modal?.HideAsync();
+    }
+
+    private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
+
+    private async Task ToggleActiveAsync(FeedbackItem feedbackitem)
+    {
+        if (feedbackitem == null) return;
+
+        feedbackitem.Active = !(feedbackitem.Active.HasValue && feedbackitem.Active.Value);
+
+        try
+        {
+            await _itemService.EditAsync(feedbackitem);
+
+            var action = feedbackitem.Active.Value ? "Activo" : "Inactivo";
+            ToastService.Notify(new ToastMessage
+                {
+                    Type = ToastType.Success,
+                    Message = $"El periodo se encuentra {action}.",
+                    Title = "Estado Actualizado"
+                });
+
+            StateHasChanged();
+
+            // await GetGrid();
+            await UpdateFeedbackUser();
+            // await grid.RefreshDataAsync();
+            // changedState.InitChanges();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task UpdateFeedbackUser()
+    {
+        _items = await _itemService.GetAsync();
+    }
+
+    private async Task SaveDefinitiveDelete(long Id)
+    {
+        try
+        {
+            await _itemService.DefinitiveDeleteAsync(Id);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            await OnHideModalClick();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Eliminar Item "
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error al borrar Item ",
+                    Title = "Error"
+                });
+        }
+    }
+}

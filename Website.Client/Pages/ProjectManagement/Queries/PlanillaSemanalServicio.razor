@@ -1,0 +1,277 @@
+﻿@using BlazorBootstrap
+@using DataContext
+@using DataModel.Dto
+@using DataModel.Enums
+@using DataService.Auth
+@using DataService.Interfaces.Management
+@using DataService.Interfaces.ProjectManagement
+@using System.Globalization
+@using OfficeOpenXml
+@using OfficeOpenXml.Table
+@using System.IO
+@using Website.Client.Pages.ProjectManagement.Queries.ExportButton
+
+@inherits Queries
+
+@inject IProjectService _projectService
+@inject IClientService _clientService
+@inject IUserService _userService
+@inject AuthService _authService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject IJSRuntime JS
+@inject NavigationManager navigationManager
+
+<div class="row">
+    <div class="col-2">
+        Cliente
+    </div>
+    <div class="col-2">
+        Fecha
+    </div>
+</div>
+<div class="row">
+    <div class="col-2">
+        <InputSelect class="form-select" @bind-Value="clientId">
+            <option selected value=-1 disabled>Seleccione</option>
+            @foreach (var p in _clients)
+            {
+                <option value=@p.Id>@p.Name</option>
+            }
+        </InputSelect>
+    </div>
+    <div class="col-2">
+        <DateInput Class="form-control" @bind-Value="@fromDate"></DateInput>
+    </div>
+    <div class="col-2">
+        <Button Class="btn btn-primary form-control" @onclick="async () => await onFilter()">Filtrar</Button>
+    </div>
+    <div class="col-2">
+        <ExportPlanillaSemanalServicioButton Progresos="_progresos" Contratos="_contratos" Perfiles="_perfiles" />
+    </div>
+</div>
+
+<br />
+<br />
+
+<div class="row" style="overflow-x: auto;">
+    <div class="col-12">
+        <Grid TItem="ProgresoTarea" @ref="grid"
+              Data="_progresos"
+              Class="table table-hover table-bordered table-striped text-nowrap"
+              AllowSorting="true"
+              AllowFiltering="true"
+              AllowPaging="true"
+              PageSize="20"
+              Responsive="true">
+
+            <GridColumn TItem="ProgresoTarea" TextNoWrap="true" HeaderText="Contrato" SortKeySelector="item => item.Contrato" PropertyName="Contrato" FilterOperator="FilterOperator.Contains">
+                @context.Contrato
+            </GridColumn>
+
+            <GridColumn TItem="ProgresoTarea" TextNoWrap="true" HeaderText="Colaborador" SortKeySelector="item => item.Colaborador" PropertyName="Colaborador" FilterOperator="FilterOperator.Contains">
+                @(!string.IsNullOrEmpty(context.Colaborador) ? context.Colaborador.Trim() : "")
+            </GridColumn>
+
+            <GridColumn TItem="ProgresoTarea" TextNoWrap="true" HeaderText="Perfil" SortKeySelector="item => item.Perfil" PropertyName="Perfil" FilterOperator="FilterOperator.Contains">
+                @context.Perfil
+            </GridColumn>
+
+            <GridColumn TItem="ProgresoTarea" TextNoWrap="true" HeaderText="Responsable" SortKeySelector="item => item.Responsable" PropertyName="Responsable" FilterOperator="FilterOperator.Contains">
+                @context.Responsable
+            </GridColumn>
+
+            <GridColumn TItem="ProgresoTarea" TextNoWrap="true" HeaderText="Proyecto" SortKeySelector="item => item.Proyecto" PropertyName="Proyecto" FilterOperator="FilterOperator.Contains">
+                @context.Proyecto
+            </GridColumn>
+
+            <GridColumn TItem="ProgresoTarea" TextNoWrap="true" HeaderText="# Ticket" SortKeySelector="item => item.RM" PropertyName="RM" FilterOperator="FilterOperator.Contains">
+                @context.RM
+            </GridColumn>
+
+            <GridColumn TItem="ProgresoTarea" TextNoWrap="true" HeaderText="Titulo" SortKeySelector="item => item.Titulo" PropertyName="Titulo" FilterOperator="FilterOperator.Contains">
+                @(!string.IsNullOrEmpty(context.Titulo) && context.Titulo.Trim().Length > 50 ? context.Titulo.Trim().Substring(0, 47) + "..." : context.Titulo)
+            </GridColumn>
+
+            <GridColumn TItem="ProgresoTarea" TextNoWrap="true" HeaderText="Fecha de Inicio" SortKeySelector="item => item.FechaInicioDate" PropertyName="FechaInicioDate" FilterOperator="FilterOperator.Equals">
+                @context.FechaInicioDate
+            </GridColumn>
+
+            <GridColumn TItem="ProgresoTarea" TextNoWrap="true" HeaderText="Fecha de Entrega" SortKeySelector="item => item.FechaEntregaDate" PropertyName="FechaEntregaDate" FilterOperator="FilterOperator.Equals">
+                @context.FechaEntregaDate
+            </GridColumn>
+
+            <GridColumn TItem="ProgresoTarea" TextNoWrap="true" TextAlignment="Alignment.End" HeaderText="Horas Estimadas" SortKeySelector="item => item.HorasEstimadas" PropertyName="HorasEstimadas" FilterOperator="FilterOperator.Equals">
+                @(context.HorasEstimadas.HasValue ? context.HorasEstimadas.Value.ToString("0.00") : "0,00")
+            </GridColumn>
+
+            <GridColumn TItem="ProgresoTarea" TextNoWrap="true" TextAlignment="Alignment.End" HeaderText="Total Horas" SortKeySelector="item => item.TotalHoras" PropertyName="TotalHoras" FilterOperator="FilterOperator.Equals">
+                @(context.TotalHoras.HasValue ? context.TotalHoras.Value.ToString("0.00") : "0,00")
+            </GridColumn>
+
+            <GridColumn TItem="ProgresoTarea" TextNoWrap="true" TextAlignment="Alignment.End" HeaderText="% Avance Total" SortKeySelector="item => item.PorcentajeAvance" PropertyName="PorcentajeAvance" FilterOperator="FilterOperator.Equals">
+                @(context.PorcentajeAvance.HasValue ? context.PorcentajeAvance.Value.ToString("0.00") : "0,00")
+            </GridColumn>
+             
+            <GridColumn TItem="ProgresoTarea" TextNoWrap="true" TextAlignment="Alignment.End" HeaderText="Hrs Incurridas" SortKeySelector="item => item.HorasSemanales" PropertyName="HorasSemanales" FilterOperator="FilterOperator.Equals">
+                @(context.HorasSemanales.HasValue ? context.HorasSemanales.Value.ToString("0.00") : "0,00")
+            </GridColumn>
+
+            <GridColumn TItem="ProgresoTarea" TextNoWrap="true" TextAlignment="Alignment.End" HeaderText="Avance Realizado en la Semana" SortKeySelector="item => item.AvanceSemanaPasada" PropertyName="AvanceSemanaPasada" FilterOperator="FilterOperator.Equals">
+                @(context.AvanceSemanaPasada.HasValue ? context.AvanceSemanaPasada.Value.ToString("0.00") : "0,00")
+            </GridColumn>
+
+            <GridColumn TItem="ProgresoTarea" TextNoWrap="true" TextAlignment="Alignment.End" HeaderText="% Avance Semanal" SortKeySelector="item => item.AvanceSemanaActual" PropertyName="AvanceSemanaActual" FilterOperator="FilterOperator.Equals">
+                @(context.AvanceSemanaActual.HasValue ? context.AvanceSemanaActual.Value.ToString("0.00") : "0,00")
+            </GridColumn>
+
+            <GridColumn TItem="ProgresoTarea" TextNoWrap="true" TextAlignment="Alignment.End" HeaderText="% Proyectado Proxima Semana" SortKeySelector="item => item.ProyeccionSemanaProxima" PropertyName="ProyeccionSemanaProxima" FilterOperator="FilterOperator.Equals">
+                @(context.ProyeccionSemanaProxima.HasValue ? context.ProyeccionSemanaProxima.Value.ToString("0.00") : "0,00")
+            </GridColumn>
+        </Grid>
+    </div>
+</div>
+
+@code {
+    [Inject] ToastService ToastService { get; set; }
+    [Inject] protected PreloadService PreloadService { get; set; }
+
+    private Grid<ProgresoTarea> grid;
+
+    private List<ProgresoTarea> _progresos = new List<ProgresoTarea>();
+    private List<ProgresoHoras> _contratos = new List<ProgresoHoras>();
+    private List<HorasTareaRol> _perfiles = new List<HorasTareaRol>();
+    private List<Client> _clients = new List<Client>(); 
+
+    private bool _errorOccurred = false;
+
+    private DateOnly fromDate = new DateOnly(DateTime.Now.Year, DateTime.Now.Month, 1);
+    private long clientId = 3;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (_errorOccurred)
+            {
+                await localStorage.ClearAsync();
+
+                ToastService.Notify(new ToastMessage()
+                    {
+                        Type = ToastType.Danger,
+                        Message = "Error inesperado al realizar la acción",
+                        Title = "Error"
+                    });
+
+                navigationManager.NavigateTo("/");
+            }
+            else
+            {
+                if (!_authService.IsLoggedIn)
+                {
+                    navigationManager.NavigateTo("/");
+                }
+                else
+                {
+                    var uri = navigationManager.Uri;
+                    await localStorage.SetItemAsync("lastUrl", uri);
+                    await localStorage.SetItemAsync("huboRecarga", false);
+                }
+            }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            PreloadService.Show();
+            await GetGrid();
+            await GetCombo();
+            await base.OnInitializedAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorOccurred = true;
+        }
+        finally
+        {
+            PreloadService.Hide();
+        }
+    }
+
+    private async Task GetCombo()
+    {
+        try
+        {
+            _clients = (await _clientService.GetAsync()).Where(x => x.Active).ToList();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task GetGrid()
+    {
+        try
+        {
+            _progresos = await _projectService.GetProgresoTareasPorFecha(DateTime.Parse(fromDate.ToString("dd-MM-yyyy")), clientId);
+            _perfiles = await _projectService.GetHorasTareasRol(DateTime.Parse(fromDate.ToString("dd-MM-yyyy")), clientId);
+            _contratos = await _projectService.GetProgresoHorasPorFecha(DateTime.Parse(fromDate.ToString("dd-MM-yyyy")), clientId);
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task onFilter()
+    {
+        try
+        {
+            await GetGrid();
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task onClear()
+    {
+        try
+        {
+            fromDate = new DateOnly(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day);
+
+            await GetGrid();
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+}

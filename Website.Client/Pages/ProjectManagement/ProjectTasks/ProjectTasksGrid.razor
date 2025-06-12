@@ -1,0 +1,904 @@
+﻿@using BlazorBootstrap
+
+@using DataContext
+@using DataModel.Enums
+@using DataService.Auth;
+@using DataService.Interfaces.Management;
+@using DataService.Interfaces.ProjectManagement
+@using DataService.State;
+@using Website.Client.Pages.SystemManagement.NonworkingDays.Component
+
+@inherits ProjectTasks
+
+@inject IProjectTaskService _service
+@inject IProjectTaskEstimationService _taskEstimationService
+@inject IRoleService _roleService
+@inject ITaskProgressService _serviceProgress
+@inject IProjectService _projectService
+@inject ITaskTypeService _taskTypeService
+@inject IClientService _clientService
+
+@inject AuthService _authService
+
+@inject NavigationManager uriHelper;
+
+@inject ChangedState changedState
+
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleContentAsync">Crear Tarea</Button>
+    </div>
+</div>
+
+<Collapse @ref="collapseAgregar" Class="custom-container">
+    <Card>
+        <CardBody>
+            <div class="row">
+                <div class="col-3">n° Ticket</div>
+                <div class="col-3">CECO</div>
+                <div class="col-3">Cliente</div>
+                <div class="col-3">Tipo de imputación <span class="text-muted small">(Opcional)</span></div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-3">
+                    <InputText class="form-control" @bind-Value="@createProject.KanbanId" maxlength="8" />
+                </div>
+
+
+                <div class="col-3">
+                    <select class="form-select"
+                    @onclick="() => OnProjectClick(createProject.ProjectId)"
+                    @bind="createProject.ProjectId"
+                    style="@GetDropdownStyle(isProjectDisabled, createProject.ProjectId)">
+                        <option selected value="-1">Seleccione</option>
+                        @foreach (var p in _projects)
+                        {
+                            <option value="@p.Id">@p.Name</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-3">
+                    <select class="form-select"
+                    @onclick="() => OnClientClick(createProject.ClientId)"
+                    @bind="createProject.ClientId"
+                    style="@GetDropdownStyle(isClientDisabled, createProject.ClientId)">
+                        <option selected value="-1">Seleccione</option>
+                        @foreach (var c in _clients)
+                        {
+                            <option value="@c.Id">@c.Name</option>
+                        }
+                    </select>
+                </div>
+
+
+
+                <div class="col-3">
+                    <InputSelect class="form-select" @bind-Value="createProject.TaskTypeId">
+                        <option selected value=-1>Seleccione</option>
+                        @foreach (var p in _taskTypes)
+                        {
+                            <option value=@p.Id>@p.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+            </div>
+
+            <div class="row mt-2">
+                <div class="col-3">Titulo</div>
+                <div class="col-3">Inicio de Tarea</div>
+                <div class="col-3">Fin de Tarea</div>
+                <div class="col-3">Entrega de Tarea</div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-3">
+                    <InputText Class="form-control" @bind-Value="@createProject.Name"></InputText>
+                </div>
+                <div class="col-3">
+                    <InputDate Class="form-control" @bind-Value="createProject.InitDate"></InputDate>
+                </div>
+                <div class="col-3">
+                    <InputDate Class="form-control" @bind-Value="createProject.EndDate"></InputDate>
+                </div>
+                <div class="col-3">
+                    <InputDate Class="form-control" @bind-Value="createProject.DeliverDate"></InputDate>
+                </div>
+            </div>
+
+            <div class="row mt-2">
+                <div class="col-12">Descripción</div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-12">
+                    <textarea Class="form-control" @bind="@createProject.Description" rows="3"></textarea>
+                </div>
+
+            </div>
+
+            @if (createProject.TaskTypeId > 0)
+            {
+                <div class="row">
+                    <div class="col-12">
+                        <imput type="text" class="form-control" style="background-color: var(--l-lightred) !important; border-color: var(--l-red) !important; color: var(--l-darkred) !important; text-align: center" disabled>
+                            Al seleccionar tipo de imputación, bloqueará la carga a sólo tareas del tipo @_taskTypes.First(x => x.Id == createProject.TaskTypeId).Name
+                        </imput>
+                    </div>
+                </div>
+                <br />
+            }
+
+            <div class="row mt-2">
+                <div class="col-6"></div>
+                <div class="col-6">
+                    <div class="row">
+                        <div class="col-6"></div>
+                        <div class="col-3">
+                            <Button Class="btn btn-secondary form-control" onclick="@(() => CancelAddTask())">Limpiar</Button>
+                        </div>
+                        <div class="col-3">
+                            <Button Class="btn btn-primary form-control" onclick="@(() => SaveAddTask())">Crear</Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </CardBody>
+    </Card>
+</Collapse>
+
+
+<br />
+<br />
+
+<Grid TItem="ProjectTask" @ref="grid"
+      Data="_projectTask"
+      Class="table table-hover table-bordered table-striped text-nowrap"
+      AllowSorting="true"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="8"
+      Responsive="true"
+      Unit="Unit.Px">
+
+    <GridColumn TItem="ProjectTask" HeaderText="Cliente" SortKeySelector="item => item.ClientName" PropertyName="ClientName" FilterOperator="FilterOperator.Contains">
+        @context.ClientName
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="CECO" SortKeySelector="item => item.ProjectName" PropertyName="ProjectName" FilterOperator="FilterOperator.Contains">
+        @context.ProjectName
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="Tipo" SortKeySelector="item => item.TaskTypeName" PropertyName="TaskTypeName" FilterOperator="FilterOperator.Contains">
+        @context.TaskTypeName
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="n° Ticket" SortKeySelector="item => item.ProjectName" PropertyName="ProjectName" FilterOperator="FilterOperator.Contains">
+        @context.KanbanId
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="Titulo" TextNoWrap="true" SortKeySelector="item => item.Name" PropertyName="Name" FilterOperator="FilterOperator.Contains">
+        <div title="@context.Name" style="max-width: 21ch; overflow: hidden; text-overflow: ellipsis;">
+            @if (context.Name.Length > 21)
+            {
+                @(context.Name.Substring(0, 17) + "...")
+            }
+            else
+            {
+                @context.Name
+            }
+        </div>
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="Descripción" TextNoWrap="true" SortKeySelector="item => item.Description" PropertyName="Description" FilterOperator="FilterOperator.Contains">
+        @context.Description
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="Estimadas" TextAlignment="Alignment.End">
+        @{
+            var tooltip = string.Join("\n", context.ProjectTaskEstimations.Select(t => $"{t.RoleName}\t{t.Hours}"));
+        }
+
+        <span title="@tooltip">
+            @context.ProjectTaskEstimations.Sum(x => x.Hours)
+        </span>
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="Completadas" TextAlignment="Alignment.End" SortKeySelector="item => item.Completed" PropertyName="Completed" FilterOperator="FilterOperator.Equals">
+        @context.Completed
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="Progreso" TextAlignment="Alignment.End" SortKeySelector="item => item.Progress" PropertyName="Progress" FilterOperator="FilterOperator.Equals">
+        @context.Progress.ToString("P")
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="Finalizado" SortKeySelector="item => item.Finished" PropertyName="Finished" FilterOperator="FilterOperator.Equals">
+        @if (context.Finished)
+        {
+            <span class="oi oi-circle-check" aria-hidden="true" style="color: var(--l-green)"></span>
+        }
+        else
+        {
+            <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-red)"></span>
+        }
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="row">
+            <div class="col-12 d-flex">
+
+                @if (!context.Finished)
+                {
+                    <Button @onclick="async () => await FinishTaskAsync(context.Id, context.Name)">
+                        <span class="oi oi-bolt" aria-hidden="true" title="Finalizar Tarea" style="color: var(--l-yellow)"></span>
+                    </Button>
+
+
+                    <Button @onclick="async () => await OnShowModalClick(context)">
+                        <span class="oi oi-pencil" aria-hidden="true" title="Editar"></span>
+                    </Button>
+
+                    @if (_authService.User?.Permissions != null && _authService.User.Permissions.Contains((long)SectionsEnum.Administrar))
+                    {
+                        <Button @onclick="async () => await OnShowModalEstimate(context)">
+                            <span class="oi oi-clock" aria-hidden="true" title="Estimar"></span>
+                        </Button>
+                    }
+
+                }
+
+                <Button @onclick="async () => await OnShowModalHistoryClick(context)">
+                    <span class="oi oi-magnifying-glass" aria-hidden="true" title="Ver Historial"></span>
+                </Button>
+
+                @if (!context.Finished)
+                {
+                    <Button @onclick="async () => await DeleteTaskAsync(context)">
+                        <span class="oi oi-circle-x" aria-hidden="true" title="Eliminar" style="color: var(--l-red)"></span>
+                    </Button>
+                }
+            </div>
+
+        </div>
+    </GridColumn>
+</Grid>
+
+<ConfirmDialog @ref="dialog" />
+
+<Modal @ref="modalEdit" Title="Editar Tarea" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h4><b>@createProject.Name</b></h4>
+            </div>
+        </div>
+        <div class="row pt-1">
+            <div class="col-12">
+                <p>@editProject.TaskType</p>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-4 d-flex align-items-center">
+                Titulo
+            </div>
+            <div class="col-8">
+                <InputText Class="form-control" @bind-Value="@editProject.Name"></InputText>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-4 d-flex align-items-center">
+                n° Ticket
+            </div>
+            <div class="col-8">
+                <InputText Class="form-control" @bind-Value="@editProject.KanbanId" maxlength="8"></InputText>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-4 d-flex align-items-center">
+                Descripcion
+            </div>
+            <div class="col-8">
+                <InputText Class="form-control" @bind-Value="@editProject.Description"></InputText>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-4 d-flex align-items-center">
+                Inicio de Tarea
+            </div>
+            <div class="col-4">
+                <InputDate Class="form-control" @bind-Value="editProject.InitDate"></InputDate>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-4 d-flex align-items-center">
+                Fin de Tarea
+            </div>
+            <div class="col-4">
+                <InputDate Class="form-control" @bind-Value="editProject.EndDate"></InputDate>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-4 d-flex align-items-center">
+                Entrega de Tarea
+            </div>
+            <div class="col-4">
+                <InputDate Class="form-control" @bind-Value="editProject.DeliverDate"></InputDate>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-4 d-flex align-items-center">
+                Tipo de imputación <span class="text-muted small"> (Opcional)</span>
+            </div>
+            <div class="col-8">
+                <InputSelect class="form-select" @bind-Value="editProject.TaskTypeId">
+                    <option selected value=-1>Seleccione</option>
+                    @foreach (var p in _taskTypes)
+                    {
+                        <option value=@p.Id>@p.Name</option>
+                    }
+                </InputSelect>
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Cerrar</Button>
+        </div>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="SaveEditTask">Guardar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+<Modal @ref="modalHistory" Title="Ver Historial" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h4><b>@editProject.Name</b></h4>
+            </div>
+        </div>
+        <br />
+        <div class="row pt-1">
+            <div class="col-12">
+                <p>@editProject.Description</p>
+            </div>
+        </div>
+
+        <div class="row pt-3">
+            <div class="col-12" style="overflow: auto; margin-bottom: 10px">
+                @foreach (var c in _taskProgress)
+                {
+                    <div class="row history-container">
+                        <div class="col-12">
+                            <div class="row" style="margin-top: 10px">
+                                <div class="col-8 d-flex align-items-center">
+                                    <b>@c.User.Username</b>
+                                </div>
+                                <div class="col-4 d-flex align-items-center justify-content-end">
+                                    @c.Date.ToString("dd/MM/yyyy HH:mm")
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="row" style="margin-top: 10px; margin-bottom: 10px">
+                                <div class="col-10">
+                                    @c.Comment
+                                </div>
+                                <div class="col-2 d-flex align-items-center justify-content-end">
+                                    @c.Hours
+                                    @if (c.Hours == 1)
+                                    {
+                                        <span style="margin: 0; padding: 0">&nbsp;Hora</span>
+                                    }
+                                    else
+                                    {
+                                        <span>&nbsp;Horas</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Cerrar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+<Modal @ref="modalEstimate" Title="Estimar" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h4><b>@editProject.Name</b></h4>
+            </div>
+        </div>
+
+        <div class="row pt-2">
+            <div class="col-6">
+                <label class="form-label">Seleccionar Rol</label>
+            </div>
+
+            <div class="col-6">
+                <label class="form-label">Importar horas</label>
+            </div>
+        </div>
+
+        <div class="row pt-1">
+            <div class="col-6">
+                <InputSelect class="form-select" @bind-Value="CreateTaskEstimation.RoleId">
+                    <option selected value=-1>Seleccione</option>
+                    @foreach (var p in _roles)
+                    {
+                        <option value=@p.Id>@p.Name</option>
+                    }
+                </InputSelect>
+            </div>
+
+            <div class="col-6">
+                <InputNumber Class="form-control" Step="0.5" @bind-Value="CreateTaskEstimation.Hours"></InputNumber>
+            </div>
+        </div>
+
+        <div class="row pt-3">
+            <div class="col-3 offset-9">
+                <Button Class="btn btn-primary form-control" onclick="@(() => AddRole())">
+                    Agregar
+                </Button>
+            </div>
+        </div>
+
+
+        <div class="row pt-4">
+            <div class="col-6" style="margin-top: 20px">
+                <h5>Roles Agregados en @editProject.Name:</h5>
+            </div>
+            <div class="col-6" style="margin-top: 20px">
+                <h5>Horas Importadas:</h5>
+            </div>
+        </div>
+
+        <div class="row pt-2">
+            <div class="col-12">
+                @if (_filteredTaskEstimations.Count == 0)
+                {
+                    <div class="row">
+                        <div class="col-12 d-flex align-items-center">
+                            No hay roles agregados
+                        </div>
+                    </div>
+                }
+                else if (_filteredTaskEstimations.Count > 0)
+                    foreach (var u in _filteredTaskEstimations)
+                    {
+                        <div class="row pt-1">
+                            <div class="col-8 d-flex align-items-center">
+                                @u.Role.Name
+                            </div>
+
+                            <div class="col-2 d-flex align-items-center">
+                                @u.Hours
+                            </div>
+                            <div class="col-2 d-flex align-items-center">
+                                <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="@(() => DeleteRole(u.ProjectTaskId, u.RoleId))">
+                                    <div class="row">
+                                        <div class="col-12 d-flex align-items-center justify-content-center">
+                                            <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-white)"></span>
+                                        </div>
+                                    </div>
+                                </Button>
+                            </div>
+                        </div>
+                    }
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Cerrar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+@code {
+    [Inject] ToastService ToastService { get; set; }
+    [Inject] protected PreloadService PreloadService { get; set; }
+
+    private Modal modalEdit;
+    private Modal modalHistory;
+    private Modal modalEstimate;
+    private ConfirmDialog dialog;
+
+    private Grid<ProjectTask> grid;
+    private Collapse collapseAgregar;
+
+    private ProjectTask createProject { get; set; } = new ProjectTask() { CreationDate = DateTime.Now, ProjectId = -1, TaskTypeId = -1 };
+
+    private DateOnly modalDate { get; set; } = DateOnly.FromDateTime(DateTime.Now);
+    private decimal modalHours { get; set; }
+    private ProjectTask editProject { get; set; } = new ProjectTask() { CreationDate = DateTime.Now, TaskTypeId = -1 };
+    private ProjectTaskEstimation CreateTaskEstimation { get; set; } = new ProjectTaskEstimation();
+
+    private string comment { get; set; }
+    private int hours { get; set; }
+    private long _currentProjectTaskId;
+
+    private bool isProjectDisabled = false;
+    private bool isClientDisabled = false;
+
+    private List<ProjectTask> _projectTask = new List<ProjectTask>();
+    private List<TaskProgress> _taskProgress = new List<TaskProgress>();
+    private List<Project> _projects = new List<Project>();
+    private List<TaskType> _taskTypes = new List<TaskType>();
+
+    private List<ProjectTaskEstimation> _taskEstimations = new List<ProjectTaskEstimation>();
+    private List<ProjectTaskEstimation> _filteredTaskEstimations = new List<ProjectTaskEstimation>();
+    private List<Role> _roles = new List<Role>();
+    private List<Client> _clients = new List<Client>();
+    private List<Section> _sections = new List<Section>();
+
+    private void OnProjectClick(long? selectedValue)
+    {
+        if (selectedValue == null || selectedValue == -1)
+        {
+            isClientDisabled = false;
+        }
+        else
+        {
+            isClientDisabled = true;
+        }
+        StateHasChanged();
+    }
+
+    private void OnClientClick(long? selectedValue)
+    {
+        if (selectedValue == null || selectedValue == -1)
+        {
+            isProjectDisabled = false;
+        }
+        else
+        {
+            isProjectDisabled = true;
+        }
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        changedState.ChangeAction -= StateHasChanged;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        PreloadService.Show();
+
+        try
+        {
+            changedState.ChangeAction += StateHasChanged;
+            await GetGrid();
+            await GetCombo();
+            await base.OnInitializedAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+        finally
+        {
+            PreloadService.Hide();
+        }
+    }
+
+    private async Task GetCombo()
+    {
+        _projects = (await _projectService.GetAsync()).Where(x => x.Active).ToList();
+        _taskTypes = (await _taskTypeService.GetAsync()).Where(x => !x.Name.Contains("ndefinid")).ToList();
+        _clients = (await _clientService.GetAsync()).ToList();
+        _taskEstimations = (await _taskEstimationService.GetAsync()).ToList();
+        _roles = (await _roleService.GetAsync()).ToList();
+    }
+
+    private async Task GetGrid()
+    {
+        _projectTask = _authService.User.ProfileId == (long)ProfileTypes.Administrador ?
+                        await _service.GetAsync() :
+                        await _service.GetByTeamsIdAsync(_authService.User.UserTeams.Select(x => x.TeamId).ToList());
+    }
+
+    private async Task SaveAddTask()
+    {
+        try
+        {           
+            if (createProject.ProjectId == -1)
+            {
+                createProject.ProjectId = null;
+            }
+
+            if (createProject.ClientId == -1)
+            {
+                createProject.ClientId = null;
+            }
+
+            await _service.AddAsync(createProject);
+            await OnHideModalClick();
+
+            ToastService.Notify(new ToastMessage
+                {
+                    Type = ToastType.Success,
+                    Message = $"Tarea creada con éxito.",
+                    Title = "Crear Tarea"
+                });
+
+            CancelAddTask(true);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+
+
+
+    private async Task AddRole()
+    {
+        CreateTaskEstimation.ProjectTaskId = _currentProjectTaskId;
+
+        try
+        {
+            await _taskEstimationService.AddAsync(CreateTaskEstimation);
+            _filteredTaskEstimations = (await _taskEstimationService.GetAsync()).Where(x => x.ProjectTaskId == _currentProjectTaskId).ToList();
+            await grid.RefreshDataAsync();
+            await GetGrid();
+
+            changedState.InitChanges();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Crear Equipo"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private void CancelAddTask(bool cleanProject = true)
+    {
+        var taskType = createProject.TaskTypeId;
+        var projectId = createProject.ProjectId;
+        var clientId = createProject.ClientId;  
+
+        createProject = new ProjectTask() { CreationDate = DateTime.Now, ProjectId = -1, TaskTypeId = -1, ClientId = -1 }; 
+
+        createProject.TaskTypeId = cleanProject ? -1 : taskType;
+        createProject.ProjectId = cleanProject ? -1 : projectId;
+        createProject.ClientId = cleanProject ? -1 : clientId; 
+
+        isProjectDisabled = false;
+        isClientDisabled = false;
+
+        StateHasChanged(); 
+    }
+
+    private async Task SaveEditTask()
+    {
+        try
+        {
+            editProject.TaskTypeId = editProject.TaskTypeId == -1 ? null : editProject.TaskTypeId;
+            editProject.TaskType = editProject.TaskTypeId == null ? null : editProject.TaskType;
+
+            await _service.EditAsync(editProject);
+            await OnHideModalClick();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Tarea modificada con éxito.",
+                    Title = "Modificar Tarea"
+                });
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task FinishTaskAsync(long taskId, string taskName)
+    {
+        try
+        {
+            var parameters = new Dictionary<string, object>();
+            parameters.Add("taskName", taskName);
+
+            var confirmation = await dialog.ShowAsync<CustomConfirmDialog>("Finalizar Tarea", parameters);
+
+            if (confirmation)
+            {
+                await _service.FinishAsync(taskId);
+
+                ToastService.Notify(new ToastMessage()
+                    {
+                        Type = ToastType.Success,
+                        Message = $"Tarea finalizada con éxito.",
+                        Title = "Finalizar Tarea"
+                    });
+
+                await GetGrid();
+                await grid.RefreshDataAsync();
+            }
+            else
+                ToastService.Notify(new ToastMessage(ToastType.Secondary, $"Acción cancelada."));
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task DeleteTaskAsync(ProjectTask projectTask)
+    {
+        try
+        {
+            var parameters = new Dictionary<string, object>();
+            parameters.Add("taskName", projectTask.Name);
+
+            var confirmation = await dialog.ShowAsync<CustomConfirmDialog>("Eliminar Tarea", parameters);
+
+            if (confirmation)
+            {
+                projectTask.Active = false;
+                await _service.EditAsync(projectTask);
+
+                ToastService.Notify(new ToastMessage()
+                    {
+                        Type = ToastType.Success,
+                        Message = $"Tarea eliminada con éxito.",
+                        Title = "Eliminar Tarea"
+                    });
+
+                await GetGrid();
+                await grid.RefreshDataAsync();
+            }
+            else
+                ToastService.Notify(new ToastMessage(ToastType.Secondary, $"Acción cancelada."));
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task DeleteRole(long projectTaskId, long roleId)
+    {
+        try
+        {
+            await _taskEstimationService.DeleteRolesAsync(projectTaskId, roleId);
+
+            _filteredTaskEstimations = _filteredTaskEstimations
+                .Where(est => est.ProjectTaskId != projectTaskId || est.RoleId != roleId)
+                .ToList();
+
+            StateHasChanged();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Rol eliminado con éxito.",
+                    Title = "Eliminar Rol"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task OnShowModalHistoryClick(ProjectTask projectTask)
+    {
+        editProject = projectTask;
+
+        _taskProgress = await _serviceProgress.GetByTaskIdAsync(projectTask.Id);
+
+        await modalHistory?.ShowAsync();
+    }
+
+    private async Task OnShowModalClick(ProjectTask projectTask)
+    {
+        editProject = projectTask;
+
+        await modalEdit?.ShowAsync();
+    }
+
+    private async Task OnShowModalEstimate(ProjectTask projectTask)
+    {
+        editProject = projectTask;
+
+        _currentProjectTaskId = editProject.Id;
+        FilterTaskEstimations(_currentProjectTaskId);
+
+        await modalEstimate?.ShowAsync();
+    }
+
+    private void FilterTaskEstimations(long projectTaskId)
+    {
+        _filteredTaskEstimations = _taskEstimations
+            .Where(m => m.ProjectTaskId == projectTaskId)
+            .ToList();
+        StateHasChanged();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        await modalEdit?.HideAsync();
+        await modalHistory?.HideAsync();
+        await modalEstimate?.HideAsync();
+    }
+
+    private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
+
+    private string GetDropdownStyle(bool isDisabled, long? selectedValue)
+    {
+      
+        if (isDisabled)
+        {
+            return "background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; pointer-events: none; cursor: not-allowed;";
+        }
+     
+        if (selectedValue != null && selectedValue != -1)
+        {
+            return "background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;"; 
+        }
+
+        return ""; 
+    }
+
+}
+
+

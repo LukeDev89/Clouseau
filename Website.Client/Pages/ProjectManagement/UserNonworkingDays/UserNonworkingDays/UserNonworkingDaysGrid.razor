@@ -1,0 +1,651 @@
+﻿@using BlazorBootstrap;
+@using DataContext;
+@using DataModel.Enums;
+@using DataService.Auth;
+@using DataService.Interfaces.Management;
+@using DataService.State;
+@using System.Globalization;
+@using System.Text.RegularExpressions;
+@using Website.Client.Pages.SystemManagement.NonworkingDays.Component
+
+@inherits UserNonworkingDays
+
+@inject IJSRuntime JSRuntime
+
+@inject IUserService _userService
+@inject IUserNonworkingDaysService _userNonworkingDaysService
+@inject ILicenseTypeService _licenseTypeService
+
+@inject AuthService _authService
+
+@inject NavigationManager uriHelper;
+
+@inject ChangedState changedState
+
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleContentAsync">Crear Licencia</Button>
+    </div>
+</div>
+
+<Collapse @ref="collapseAgregar" Class="custom-container">
+    <Card>
+        <CardBody>             
+            <div class="row">
+                <div class="col-3">
+                    Usuario
+                </div>
+                <div class="col-3">
+                    Tipo
+                </div>
+
+                <div class="col-3">
+                    Desde
+                </div>
+                <div class="col-3">
+                    Hasta
+                </div>               
+            </div>
+            <div class="row mt-2">
+                <div class="col-3">
+                    <InputSelect class="form-select" @bind-Value="createUser">
+                        <option selected value=-1 disabled>Seleccione</option>
+                        @foreach (var p in _users)
+                        {
+                            <option value=@p.Id>@p.Firstname @p.Lastname (@p.Username)</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-3">
+                    <InputSelect class="form-select" @bind-Value="@createType" @bind-Value:after="LoadTypeInfo">
+                        <option selected value=-1 disabled>Seleccione</option>
+                        @foreach (var t in _types)
+                        {
+                            <option value=@t.Id>@t.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-3">
+                    <DateInput Class="form-control" @bind-Value="@createFrom"></DateInput>
+                </div>
+                <div class="col-3">
+                    <DateInput Class="form-control" @bind-Value="@createTo"></DateInput>
+                </div>
+            </div>
+            <br />
+            <div class="row">
+                <div class="col-6">
+                    Comentario
+                </div>
+                <div class="col-6">
+                    Archivo
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-6">
+                    <InputText Class="form-control" @bind-Value="@createComment"></InputText>
+                </div>
+                <div class="col-6">
+                    <InputFile @key=@(_inputFileId) OnChange="@LoadFile" class="form-control" />
+                </div>
+            </div>
+            <br />
+            @if (createType > 0)
+            {
+                <div class="row">
+                    <div class="col-12">
+                        <InputText Class="form-control" style="background-color: var(--l-lightred) !important; border-color: var(--l-red) !important; color: var(--l-darkred) !important; text-align: center" @bind-Value="@typeInfo" disabled></InputText>
+                    </div>
+                </div>
+                <br />
+            }
+            <div class="row">
+                <div class="col-6">
+                </div>
+                <div class="col-6">
+                    <div class="row">
+                        <div class="col-6"></div>
+                        <div class="col-3">
+                            <Button Class="btn btn-secondary form-control" onclick="@(() => CancelAddTask())">
+                                Limpiar
+                            </Button>
+                        </div>
+                        <div class="col-3">
+                            <Button Class="btn btn-primary form-control" onclick="@(() => SaveAddTask())">
+                                Crear
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </CardBody>
+    </Card>
+</Collapse>
+
+<br />
+<br />
+
+
+<Grid TItem="UserNonworkingDay" @ref="grid"
+      Data="_userNonworkingDays"
+      Class="table table-hover table-bordered table-striped text-nowrap"
+      AllowSorting="true"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="8"
+      Responsive="true"
+      Unit="Unit.Px">
+
+    <GridColumn TItem="UserNonworkingDay" HeaderText="Nombre" Freeze="true" FreezeLeftPosition="0" TextNoWrap="true" SortKeySelector="item => item.UserFullname" PropertyName="UserFullname" FilterOperator="FilterOperator.Contains">
+        @($"{@context.UserFullname}")
+    </GridColumn>
+
+    <GridColumn TItem="UserNonworkingDay" HeaderText="Tipo" SortKeySelector="item => item.TypeName" PropertyName="TypeName" FilterOperator="FilterOperator.Contains">
+        @context.TypeName
+    </GridColumn>
+
+    <GridColumn TItem="UserNonworkingDay" HeaderText="Solicitado" TextNoWrap="true" SortKeySelector="item => item._Created" PropertyName="_Created" FilterOperator="FilterOperator.Equals">
+        @context._Created.ToString("dd/MM/yyyy")
+    </GridColumn>
+
+    <GridColumn TItem="UserNonworkingDay" HeaderText="Desde" TextNoWrap="true" SortKeySelector="item => item._DateFrom" PropertyName="_DateFrom" FilterOperator="FilterOperator.Equals">
+        @context._DateFrom.ToString("dd/MM/yyyy")
+    </GridColumn>
+
+    <GridColumn TItem="UserNonworkingDay" HeaderText="Hasta" TextNoWrap="true" SortKeySelector="item => item._DateTo" PropertyName="_DateTo" FilterOperator="FilterOperator.Equals">
+        @context._DateTo.ToString("dd/MM/yyyy")
+    </GridColumn>
+
+    <GridColumn TItem="UserNonworkingDay" HeaderText="Comentario" Sortable="false" Filterable="false">
+        @context.Comment
+    </GridColumn>
+
+    <GridColumn TItem="UserNonworkingDay" HeaderText="Motivo Rechazo" Sortable="false" Filterable="false">
+        @context.CommentCfo
+    </GridColumn>
+
+    <GridColumn TItem="UserNonworkingDay" HeaderText="Estado" TextNoWrap="true" SortKeySelector="item => item.State" PropertyName="State" Filterable="false">
+        @if (context.State == (short)NonworkingStatus.Pending)
+        {
+            <span class="badge bg-warning w-100" style="margin-top: 8px; margin-bottom: 8px">Pendiente</span>
+        }
+        else if (context.State == (short)NonworkingStatus.Approved)
+        {
+            <span class="badge bg-success w-100" style="margin-top: 8px; margin-bottom: 8px">Aprobado</span>
+        }
+        else if (context.State == (short)NonworkingStatus.Rejected)
+        {
+            <span class="badge w-100" style="margin-top: 8px; margin-bottom: 8px">Rechazado</span>
+        }
+        else if (context.State == (short)NonworkingStatus.Cancelled)
+        {
+            <span class="badge bg-secondary w-100" style="margin-top: 8px; margin-bottom: 8px">Cancelado</span>
+        }
+        else if (context.State == (short)NonworkingStatus.Expired)
+        {
+            <span class="badge bg-secondary w-100" style="margin-top: 8px; margin-bottom: 8px">Expirado</span>
+        }
+        else
+        {
+            <span class="badge bg-secondary w-100" style="margin-top: 8px; margin-bottom: 8px">Desconocido</span>
+        }
+    </GridColumn>
+
+    <GridColumn TItem="UserNonworkingDay" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="row">
+            <div class="col-12 d-flex">
+                @if (context.State == (short)NonworkingStatus.Pending)
+                {
+                    <Button @onclick="async () => await ChangeStateRequest(context.Id, (short)NonworkingStatus.Approved)">
+                        <span class="oi oi-circle-check" aria-hidden="true" title="Aprobar" style="color: var(--l-green)"></span>
+                    </Button>
+                    <Button @onclick="async () => await OnShowModalClick(context)">
+                        <span class="oi oi-circle-x" aria-hidden="true" title="Rechazar" style="color: var(--l-red)"></span>
+                    </Button>
+                }
+                @if (!string.IsNullOrEmpty(context.Path))
+                {
+                    <Button @onclick="async () => DownloadFile(context.Id)">
+                        <span class="oi oi-data-transfer-download" aria-hidden="true" title="Descargar Archivo" style="color: var(--l-white)"></span>
+                    </Button>
+                }
+                @if (_authService.User.Id == context.UserId && context.State == (short)NonworkingStatus.Pending)
+                {
+                    <Button @onclick="async () => await ChangeStateRequest(context.Id, (short)NonworkingStatus.Cancelled)">
+                        <span class="oi oi-ban" aria-hidden="true" title="Cancelar" style="color: var(--l-orange)"></span>
+                    </Button>
+                    <Button @onclick="async () => await DeleteTaskAsync(context)">
+                        <span class="oi oi-trash" aria-hidden="true" title="Eliminar" style="color: var(--l-white)"></span>
+                    </Button>
+                }
+            </div>
+        </div>
+    </GridColumn>
+</Grid>
+
+<ConfirmDialog @ref="dialog" />
+
+<Modal @ref="rejectModal" Title="Usuarios" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-6">
+                @modalRejectedDay.UserFullname
+            </div>
+            <div class="col-6">
+                @modalRejectedDay.TypeName
+            </div>
+        </div>
+        <br />
+        <div class="row mt-2">
+            <div class="col-12">
+                Comentario de Rechazo
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-12">
+                <InputText Class="form-control" @bind-Value="modalRejectedDay.CommentCfo"></InputText>
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Cerrar</Button>
+        </div>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="async () => await ChangeStateRequest(modalRejectedDay.Id, (short)NonworkingStatus.Rejected, modalRejectedDay.CommentCfo)">Guardar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+<script suppress-error="BL9992">
+    function downloadFileFromBase64(filename, fileExtension, base64Data) {
+        const url = `data:application/${fileExtension};base64,${base64Data}`;
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+</script>
+
+@code
+{
+    [Inject] ToastService ToastService { get; set; }
+    private ConfirmDialog dialog;
+    private Modal rejectModal;
+
+    private bool _errorOccurred = false;
+
+    private const int MAX_WEIGHT_FILE_IN_MB = 5;
+
+    private Grid<UserNonworkingDay> grid;
+    private Collapse collapseAgregar;
+
+    private string createComment { get; set; }
+    private IBrowserFile createFile;
+    private short createType { get; set; } = -1;
+    private long createUser { get; set; } = -1;
+    private DateTime createFrom { get; set; } = DateTime.Now.AddDays(1);
+    private DateTime createTo { get; set; } = DateTime.Now.AddDays(1);
+    private string _inputFileId = Guid.NewGuid().ToString();
+
+    private string typeInfo { get; set; }
+
+    private UserNonworkingDay modalRejectedDay = new UserNonworkingDay();
+
+    private List<User> _users = new List<User>();
+    private List<LicenseType> _types = new List<LicenseType>();
+    private List<UserNonworkingDay> _userNonworkingDays = new List<UserNonworkingDay>();
+
+    private string pattern = @"(?<!^)(?=[A-Z])";
+    private readonly string[] prepositions = { "A", "Ante", "Bajo", "Cabe", "Con", "Contra", "De", "Desde", "En", "Entre", "Hacia", "Hasta", "Por", "Según", "Sin", "Sobre", "Tras", "Durante", "Mediante", "Excepto", "Salvo", "Incluido", "Segun", "Pro" };
+
+    private void LoadTypeInfo()
+    {
+        var type = _types.First(x => x.Id == createType);
+        typeInfo = !string.IsNullOrEmpty(type.HelperMessage) ? type.HelperMessage.Trim() : "";
+    }
+
+    private async Task OnHideModalClick()
+    {
+        modalRejectedDay = new UserNonworkingDay();
+
+        await rejectModal?.HideAsync();
+    }
+
+    private async Task OnShowModalClick(UserNonworkingDay userNonworking)
+    {
+        modalRejectedDay = userNonworking;
+        await rejectModal?.ShowAsync();
+    }
+
+    private void LoadFile(InputFileChangeEventArgs e)
+    {
+        createFile = e.File;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            PreloadService.Show();
+            await GetGrid();
+            await GetCombo();
+            await base.OnInitializedAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorOccurred = true;
+        }
+        finally
+        {
+            PreloadService.Hide();
+        }
+    }
+
+    private async Task GetCombo()
+    {
+        try
+        {
+            _users = (await _userService.GetAsync()).Where(x => x.IsActive).ToList();
+
+            if (_authService.User.ProfileId == (long)ProfileTypes.GestorProyectos) 
+            {
+                _users = _users.Where(u => u.UserTeams.Any(ut => _authService.User.UserTeams.Any(t => t.TeamId == ut.TeamId))).ToList();
+            }
+
+            _types = (await _licenseTypeService.GetAsync()).ToList();
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task GetGrid()
+    {
+        try
+        {
+            if (_authService.User.ProfileId == (short)ProfileTypes.GestorProyectos)
+            {
+                _userNonworkingDays = (await _userNonworkingDaysService.GetAsync())
+                    .Where(n => n.UserId == _authService.User.Id || n.User.Superior == _authService.User.Id || n.User.UserTeams.Any(ut => _authService.User.UserTeams.Any(t => t.TeamId == ut.TeamId)))
+                    .OrderBy(x => x.State).ThenByDescending(x => x.Created).ToList();
+            }
+            else
+            {
+                _userNonworkingDays = (await _userNonworkingDaysService.GetAsync())
+                    .OrderBy(x => x.State).ThenByDescending(x => x.Created).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveAddTask()
+    {
+        try
+        {
+            if (createType < 0)
+            {
+                ToastService.Notify(new ToastMessage()
+                    {
+                        Type = ToastType.Danger,
+                        Message = "Debe seleccionar un tipo de licencia.",
+                        Title = "Error"
+                    });
+                return;
+            }
+
+            if (createTo.Date < createFrom.Date)
+            {
+                ToastService.Notify(new ToastMessage()
+                    {
+                        Type = ToastType.Danger,
+                        Message = "La fecha de inicio no puede ser mayor a la fecha de fin.",
+                        Title = "Error"
+                    });
+                return;
+            }
+
+            if (string.IsNullOrEmpty(createComment)) 
+            {
+                ToastService.Notify(new ToastMessage()
+                    {
+                        Type = ToastType.Danger,
+                        Message = "Debe ingresar un comentario.",
+                        Title = "Error"
+                    });
+                return;
+            }
+
+            string? fileBase64 = null;
+            string? fileExtension = null;
+
+            if (createFile != null)
+            {
+                fileExtension = Path.GetExtension(createFile.Name);
+
+                long maxSize = MAX_WEIGHT_FILE_IN_MB * 1024 * 1024;
+
+                if (createFile.Size > 0 && createFile.Size <= maxSize)
+                {
+                    await using var stream = createFile.OpenReadStream(maxSize);
+                    using var memoryStream = new MemoryStream();
+                    await stream.CopyToAsync(memoryStream);
+                    byte[] fileBytes = memoryStream.ToArray();
+
+                    fileBase64 = Convert.ToBase64String(fileBytes);
+                }
+                else
+                {
+                    ToastService.Notify(new ToastMessage()
+                        {
+                            Type = ToastType.Danger,
+                            Message = "El archivo excede el tamaño máximo permitido de 5 MB.",
+                            Title = "Error"
+                        });
+                    return;
+                }
+            }
+
+            var type = _types.First(x => x.Id == createType);
+
+            if (type.FileRequired && createFile == null)
+            {
+                ToastService.Notify(new ToastMessage()
+                    {
+                        Type = ToastType.Danger,
+                        Message = "Debe adjuntar un archivo para este tipo de licencia.",
+                        Title = "Error"
+                    });
+                return;
+            }
+
+            var consecutiveDays = (createTo.Date - createFrom.Date).TotalDays;
+
+            if (type.ConsecutiveDays < consecutiveDays)
+            {
+                ToastService.Notify(new ToastMessage()
+                    {
+                        Type = ToastType.Danger,
+                        Message = $"El tipo de licencia seleccionado no permite más de {type.ConsecutiveDays} días consecutivos.",
+                        Title = "Error"
+                    });
+                return;
+            }
+
+            var vacationType = _types.First(x => x.Name.Contains("Vacaci"));
+            var cfoWeekType = _types.First(x => x.Name.Contains("Semana CFO"));
+            var user = _users.First(x => x.Id == createUser);
+
+            var daysPerYear = _userNonworkingDays.Where(x => x.UserId == createUser
+                && x.State == (short)NonworkingStatus.Approved
+                && x.DateFrom.Year == DateTime.Now.Year)
+            .Sum(x => (x.DateTo.Date - x.DateFrom.Date).TotalDays) + (createTo.Date - createFrom.Date).TotalDays;
+
+            var vacationsPerYear = _userNonworkingDays.Where(x => x.UserId == createUser
+                && x.State == (short)NonworkingStatus.Approved
+                && x.DateFrom.Month > 4
+                && x.DateFrom.Year == DateTime.Now.Year)
+            .Sum(x => (x.DateTo.Date - x.DateFrom.Date).TotalDays) + (createTo.Date - createFrom.Date).TotalDays;
+
+            if (type.Id != vacationType.Id && type.Id != cfoWeekType.Id && type.MaxDaysPerYear < daysPerYear)
+            {
+                ToastService.Notify(new ToastMessage()
+                    {
+                        Type = ToastType.Danger,
+                        Message = $"El usuario {user.UserFullName} exede la cantidad de días permitido para este tipo de Licencia.",
+                        Title = "Error"
+                    });
+                return;
+            }
+            else if ((type.Id == vacationType.Id || type.Id == cfoWeekType.Id) && type.MaxDaysPerYear < vacationsPerYear)
+            {
+                ToastService.Notify(new ToastMessage()
+                    {
+                        Type = ToastType.Danger,
+                        Message = $"El usuario {user.UserFullName} exede la cantidad de días permitido para este tipo de Licencia.",
+                        Title = "Error"
+                    });
+                return;
+            }
+
+            await _userNonworkingDaysService.AddAsync(createUser, createType, createFrom.Date, createTo.Date, createComment, fileExtension, fileBase64);
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Licencia o Vacaciones creada con éxito.",
+                    Title = "Crear Licencia o Vacaciones"
+                });
+
+            CancelAddTask();
+            await GetGrid();
+            await grid.RefreshDataAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private void CancelAddTask()
+    {
+        createFrom = DateTime.Now.AddDays(1);
+        createTo = DateTime.Now.AddDays(1);
+        createComment = string.Empty;
+        createFile = null!;
+        createType = -1;
+        createUser = -1;
+        _inputFileId = Guid.NewGuid().ToString();
+    }
+
+    private async Task DeleteTaskAsync(UserNonworkingDay userNonworkingDay)
+    {
+        try
+        {
+            var parameters = new Dictionary<string, object>();
+            parameters.Add("taskName", userNonworkingDay.UserFullname);
+
+            var confirmation = await dialog.ShowAsync<CustomConfirmDialog>("Eliminar Licencia o Vacaciones", parameters);
+
+            if (confirmation)
+            {
+                await _userNonworkingDaysService.DeleteAsync(userNonworkingDay.Id);
+
+                ToastService.Notify(new ToastMessage()
+                    {
+                        Type = ToastType.Success,
+                        Message = $"Licencia o Vacaciones eliminada con éxito.",
+                        Title = "Eliminar Licencia o Vacaciones"
+                    });
+
+                await GetGrid();
+                await grid.RefreshDataAsync();
+            }
+            else
+                ToastService.Notify(new ToastMessage(ToastType.Secondary, $"Acción cancelada."));
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task ChangeStateRequest(long Id, short state, string commentCfo = "")
+    {
+        try
+        {
+            await _userNonworkingDaysService.UpdateState(Id, state, commentCfo);
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Se ha completado acción",
+                    Title = "Cambio de Estado"
+                });
+
+            if (state == (short)NonworkingStatus.Rejected && commentCfo == "")
+            {
+                ToastService.Notify(new ToastMessage()
+                        {
+                            Type = ToastType.Warning,
+                            Message = "El comentario de rechazo es obligatorio",
+                            Title = "Error"
+                        });
+                return;    
+            }
+
+            await rejectModal?.HideAsync();
+            await GetGrid();
+            await grid.RefreshDataAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task DownloadFile(long Id)
+    {
+        var fileResponse = await _userNonworkingDaysService.DownloadFile(Id);
+
+        await JSRuntime.InvokeVoidAsync("downloadFileFromBase64",
+            fileResponse.FileName, fileResponse.FileExtension, fileResponse.FileBytes);
+    }
+
+    private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
+}

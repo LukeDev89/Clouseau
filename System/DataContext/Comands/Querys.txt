@@ -1,0 +1,9 @@
+﻿OBTENER CARGAS POR MES POR PROYECTO
+
+select p.Id, pr.name, t.name, t.description, u.username, p.date, tt.name, p.hours, p.comment from TaskProgress p
+left join ProjectTasks t on p.taskId = t.Id
+left join Users u on p.userId = u.Id
+left join Projects pr on pr.Id = t.projectId
+left join TaskTypes tt on p.taskTypeId = tt.Id
+where p.date between '01/04/2024 00:00:00' and '30/04/2024 00:00:00'
+order by p.date

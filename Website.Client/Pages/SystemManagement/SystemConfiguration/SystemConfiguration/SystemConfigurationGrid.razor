@@ -1,0 +1,295 @@
+﻿@using BlazorBootstrap;
+@using DataContext;
+@using DataModel.Enums;
+@using DataService.Auth;
+@using DataService.Interfaces.Management;
+@using DataService.State;
+@using System.Globalization;
+
+@inherits SystemConfiguration
+
+@inject IJSRuntime JSRuntime
+
+@inject AuthService _authService
+@inject NavigationManager uriHelper
+@inject ChangedState changedState
+
+@inject ISystemConfigService _service
+
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleContentAsync">Crear Configuración</Button>
+    </div>
+</div>
+
+<Collapse @ref="collapseAgregar" Class="custom-container">
+    <Card>
+        <CardBody>
+            <div class="row">
+                <div class="col-3">
+                    Nombre
+                </div>
+                <div class="col-3">
+                    Descripcion
+                </div>
+
+                <div class="col-3">
+                    Tipo de Dato
+                </div>
+                <div class="col-3">
+                    Valor
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-3">
+                    <InputText Class="form-control" @bind-Value="@createConfig.Name"></InputText>
+                </div>
+                <div class="col-3">
+                    <InputText Class="form-control" @bind-Value="@createConfig.Description"></InputText>
+                </div>
+                <div class="col-3">
+                    <InputSelect class="form-select" @bind-Value="createConfig.DataType">
+                        <option selected value=-1 disabled>Seleccione</option>
+                        @foreach (DataModel.Enums.ValueType v in Enum.GetValues(typeof(DataModel.Enums.ValueType)))
+                        {
+                            <option value=@((short)v)>@v</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-3">
+                    <InputText Class="form-control" @bind-Value="@createConfig.DataValue"></InputText>
+                </div>
+            </div>
+            <br />
+            <div class="row">
+                <div class="col-6">
+                </div>
+                <div class="col-6">
+                    <div class="row">
+                        <div class="col-6"></div>
+                        <div class="col-3">
+                            <Button Class="btn btn-secondary form-control" onclick="@(() => CancelAdd())">
+                                Limpiar
+                            </Button>
+                        </div>
+                        <div class="col-3">
+                            <Button Class="btn btn-primary form-control" onclick="@(() => SaveAdd())">
+                                Crear
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </CardBody>
+    </Card>
+</Collapse>
+
+<br />
+<br />
+
+<Grid TItem="SystemConfig" @ref="grid"
+      Data="_configurations"
+      Class="table table-hover table-bordered table-striped text-nowrap"
+      AllowSorting="true"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="8"
+      Responsive="true"
+      Unit="Unit.Px">
+
+    <GridColumn TItem="SystemConfig" HeaderText="Nombre" TextNoWrap="true" SortKeySelector="item => item.Name" PropertyName="Name" FilterOperator="FilterOperator.Contains">
+        @context.Name
+    </GridColumn>
+
+    <GridColumn TItem="SystemConfig" HeaderText="Descripción" SortKeySelector="item => item.Description" PropertyName="Description" FilterOperator="FilterOperator.Contains">
+        @context.Description
+    </GridColumn>
+
+    <GridColumn TItem="SystemConfig" HeaderText="Tipo" SortKeySelector="item => item.DataTypeName" PropertyName="DataTypeName" FilterOperator="FilterOperator.Contains">
+        @context.DataTypeName
+    </GridColumn>
+
+    <GridColumn TItem="SystemConfig" HeaderText="Valor" SortKeySelector="item => item.DataValue" PropertyName="DataValue" FilterOperator="FilterOperator.Contains">
+        @context.DataValue
+    </GridColumn>
+
+    <GridColumn TItem="SystemConfig" HeaderText="Valor Previo" SortKeySelector="item => item.PreviousValue" PropertyName="PreviousValue" FilterOperator="FilterOperator.Contains">
+        @context.PreviousValue
+    </GridColumn>
+
+    <GridColumn TItem="SystemConfig" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="row">
+            <div class="col-12 d-flex">
+                <Button @onclick="async () => await OnShowModalClick(context)">
+                    <span class="oi oi-pencil" aria-hidden="true" title="Editar" style="color: var(--l-white)"></span>
+                </Button>
+            </div>
+        </div>
+    </GridColumn>
+</Grid>
+
+
+<Modal @ref="editModal" Title="Editar Configuración" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-3">
+                Nombre
+            </div>
+            <div class="col-3">
+                Descripcion
+            </div>
+
+            <div class="col-3">
+                Tipo de Dato
+            </div>
+            <div class="col-3">
+                Valor
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-3">
+                <InputText Class="form-control" @bind-Value="@modalConfig.Name"></InputText>
+            </div>
+            <div class="col-3">
+                <InputText Class="form-control" @bind-Value="@modalConfig.Description"></InputText>
+            </div>
+            <div class="col-3">
+                <InputSelect class="form-select" @bind-Value="modalConfig.DataType">
+                    <option selected value=-1 disabled>Seleccione</option>
+                    @foreach (DataModel.Enums.ValueType v in Enum.GetValues(typeof(DataModel.Enums.ValueType)))
+                    {
+                        <option value=@((short)v)>@v</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-3">
+                <InputText Class="form-control" @bind-Value="@modalConfig.DataValue"></InputText>
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Cerrar</Button>
+        </div>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="async () => await SaveEdit()">Guardar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+@code
+{
+    [Inject] ToastService ToastService { get; set; }
+    private ConfirmDialog dialog;
+    private Modal editModal;
+    private Grid<SystemConfig> grid;
+    private Collapse collapseAgregar;
+
+    private SystemConfig createConfig = new SystemConfig();
+    private SystemConfig modalConfig = new SystemConfig();
+
+    private List<SystemConfig> _configurations = new List<SystemConfig>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        createConfig = new SystemConfig() { DataType = -1 };
+
+        await GetGrid();
+        await base.OnInitializedAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        modalConfig = new SystemConfig() { DataType = -1 };
+
+        await editModal?.HideAsync();
+    }
+
+    private async Task OnShowModalClick(SystemConfig config)
+    {
+        modalConfig = config;
+        await editModal?.ShowAsync();
+    }
+
+    private async Task GetGrid()
+    {
+        try
+        {
+            _configurations = await _service.GetAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveAdd()
+    {
+        try
+        {
+            await _service.AddAsync(createConfig);
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con éxito",
+                    Title = "Configuración"
+                });
+
+            CancelAdd();
+            await GetGrid();
+            await grid.RefreshDataAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveEdit()
+    {
+        try
+        {
+            await _service.EditAsync(modalConfig);
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con éxito",
+                    Title = "Configuración"
+                });
+
+            await OnHideModalClick();
+            await GetGrid();
+            await grid.RefreshDataAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private void CancelAdd()
+    {
+        createConfig = new SystemConfig() { DataType = -1 };
+    }
+
+    private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
+}

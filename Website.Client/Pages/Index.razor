@@ -1,0 +1,256 @@
+﻿@page "/"
+
+@using DataContext
+@using DataModel
+@using DataModel.Enums;
+@using DataService.Auth;
+@using BlazorBootstrap;
+@using DataService.Interfaces.GadgetExpress;
+@using DataService.Interfaces.Management
+@using DataService.State;
+
+@implements IDisposable
+@inject LoginState loginState;
+@inject AuthService authService
+@inject NavigationManager NavigationManager
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject IConfiguration Configuration
+@inject IUserService userService
+
+<PageTitle>Clouseau</PageTitle>
+
+<br />
+
+@if (!authService.IsLoggedIn)
+{
+    <EditForm Model="@loginModel" OnValidSubmit="@HandleLogin">
+        <div class="row d-flex justify-content-center">
+            <div class="col-3">
+                <Card>
+                    <CardBody>
+                        <br />
+                        <div class="row">
+                            <div class="col-12 d-flex justify-content-center align-items-center">
+                                <img height="60" src="cfologo.png" alt="clouseau" />
+                            </div>
+                        </div>
+                        <br />
+                        <div class="row">
+                            <div class="col-12 d-flex justify-content-center">
+                                <h5>Inicio de Sesión</h5>
+                            </div>
+                        </div>
+                        <br />
+                        <div class="row">
+                            <div class="col-1"></div>
+                            <div class="col-10">
+                                <InputText placeholder="Usuario" Class="form-control" @bind-Value="@loginModel.Username"></InputText>
+                            </div>
+                        </div>
+                        <br />
+                        <br />
+                        <div class="row">
+                            <div class="col-1"></div>
+                            <div class="col-10">
+                                <InputText placeholder="Contraseña" type="password" Class="form-control" @bind-Value="@loginModel.Password"></InputText>
+                            </div>
+                        </div>
+                        <br />
+                        <br />
+                        <div class="row">
+                            <div class="col-1"></div>
+                            <div class="col-10">
+                                <Button Class="btn btn-primary form-control" Type="ButtonType.Submit">
+                                    Iniciar Sesión
+                                </Button>
+                            </div>
+                        </div>
+                        <br />
+                        <div class="row">
+                            <div class="col-1"></div>
+                            <div class="col-10 d-flex justify-content-end">
+                                <NavLink style="font-size: 12px" Match="NavLinkMatch.All" href="/recovery">Olvidé mi contraseña</NavLink>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-1"></div>
+                            <div class="col-10 d-flex justify-content-end">
+                                <NavLink style="font-size: 12px">Registrate</NavLink>
+                            </div>
+                        </div>
+                        <br />
+                    </CardBody>
+                </Card>
+            </div>
+        </div>
+    </EditForm>
+}
+else
+{
+    <div class="row d-flex justify-content-center">
+        <div class="col-3">
+            <Card>
+                <CardBody>
+                    <br />
+                    <div class="row">
+                        <div class="col-12 d-flex justify-content-center">
+                            <p>Bienvenido, @authService.User.Firstname @authService.User.Lastname !</p>
+                        </div>
+                    </div>
+                    <br />
+                    <div class="row">
+                        <div class="col-1"></div>
+                        <div class="col-10">
+                            <Button Class="btn btn-primary form-control" @onclick="() => SendRequest()">
+                                Cambiar Contraseña
+                            </Button>
+                            
+                        </div>
+                    </div>
+                    <br />
+                    <div class="row">
+                        <div class="col-1"></div>
+                        <div class="col-10">
+                            <Button Class="btn btn-secondary form-control" @onclick="@(async () => await HandleLogout())">
+                                Cerrar Sesión
+                            </Button>
+                        </div>
+                    </div>
+                    <br />
+                </CardBody>
+            </Card>
+        </div>
+    </div>
+    <br />
+    <br />
+    @if (!string.IsNullOrEmpty(authService.IncompleteHoursMessage))
+    {
+        <div class="row">
+            <div class="col-12">
+                <Alert Color="AlertColor.Warning">
+                    <Icon Name="IconName.ExclamationTriangleFill" class="me-2"></Icon><strong>@((MarkupString)authService.IncompleteHoursMessage)</strong>
+                </Alert>
+            </div>
+        </div>
+        <br />
+    }
+}
+
+@code {
+    private class LoginModel
+    {
+        public string Username { get; set; } = "";
+        public string Password { get; set; } = "";
+    }
+
+    private string errMessage = "";
+
+    private LoginModel loginModel = new LoginModel();
+    [Inject] ToastService ToastService { get; set; }
+
+    private string Token { get; set; }
+
+    private string _userName { get; set; }
+    private string _userPassword { get; set; }
+    private string _lastUrl { get; set; }
+    private bool _huboRecarga { get; set; }
+
+    protected override void OnInitialized()
+    {
+        loginState.LoginAction += StateHasChanged;
+        Token = Configuration["Tokens:RecoveryToken"];
+    }
+
+    public void Dispose()
+    {
+        loginState.LoginAction -= StateHasChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            bool isAuthenticated = authService.User != null && authService.User.Id != 0;
+            _userName = await localStorage.GetItemAsync<string>("userName");
+            _userPassword = await localStorage.GetItemAsync<string>("userPassword");
+
+            _lastUrl = await localStorage.GetItemAsync<string>("lastUrl");
+            _huboRecarga = await localStorage.GetItemAsync<bool>("huboRecarga");
+
+            if (!isAuthenticated && !string.IsNullOrEmpty(_userName) && !string.IsNullOrEmpty(_userPassword))
+            {
+                var result = await authService.Login(_userName, _userPassword);
+
+                if (result == LoginType.Correcto)
+                {
+                    _huboRecarga = true;
+                    isAuthenticated = true;
+                    StateHasChanged();
+                }
+            }
+
+            if (isAuthenticated && _huboRecarga && !string.IsNullOrEmpty(_lastUrl))
+            {
+                await localStorage.SetItemAsync("huboRecarga", false);
+                NavigationManager.NavigateTo(_lastUrl);
+            }
+        }
+    }
+
+    private async Task SendRequest()
+    {
+        var result = await userService.ResetPassword(authService.User.Username);
+
+        if (result) NavigationManager.NavigateTo($"/newpassword/{authService.User.Username}/{Token}");
+    }
+
+    private async Task HandleLogin()
+    {
+        loginModel.Username = loginModel.Username.Contains("@") ? 
+                                loginModel.Username.Split('@')[0] : 
+                                loginModel.Username;
+
+        var result = await authService.Login(loginModel.Username, loginModel.Password);
+
+        if (result != LoginType.Correcto)
+        {
+            switch (result.ToString())
+            {
+                case "UsuarioIncorrecto":
+                    errMessage = "Usuario incorrecto";
+                    break;
+                case "PasswordIncorrecto":
+                    errMessage = "Contraseña incorrecta";
+                    break;
+                case "UsuarioBloqueado":
+                    errMessage = "Usuario bloqueado";
+                    break;
+                case "UsuarioInactivo":
+                    errMessage = "Usuario inactivo";
+                    break;
+                default:
+                    errMessage = "Error desconocido";
+                    break;
+            }
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = errMessage + " intente nuevamente.",
+                    Title = "Error de Login"
+                });
+        }
+
+        await localStorage.SetItemAsync("userName", loginModel.Username);
+        await localStorage.SetItemAsync("userPassword", loginModel.Password);
+
+        loginState.InitLogin();
+    }
+
+    protected async Task HandleLogout()
+    {
+        authService.Logout();
+        await localStorage.ClearAsync();
+        loginState.InitLogin();
+    }
+}

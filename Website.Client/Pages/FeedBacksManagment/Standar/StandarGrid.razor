@@ -1,0 +1,401 @@
+﻿@using BlazorBootstrap
+@using DataContext
+@using DataModel.Enums
+@using DataService.Auth;
+@using DataService.Interfaces.Management;
+@using DataService.Interfaces.ProjectManagement
+@using DataService.State;
+
+@inherits Standar
+
+@inject IFeedBackStandarService _standarService
+
+@inject ChangedState changedState
+
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleContentAsync">
+            Crear Categoría
+        </Button>
+    </div>
+</div>
+<Collapse @ref="collapseAgregar">
+    <Card>
+        <CardBody>
+            <div class="row">
+                <div class="col-12">
+                    <span class="text-nowrap">Nombre</span>
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-12">
+                    <textarea class="form-control" @bind="@createStandar.Name" rows="1"></textarea>
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-12">
+                    <span class="text-nowrap">Descripción</span>
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-12">
+                    <textarea class="form-control" @bind="createStandar.Description" rows="4"></textarea>
+                </div>
+            </div>
+            <div class="row mt-4">
+                <div class="col-6">
+                </div>
+                <div class="col-6">
+                    <div class="row">
+                        <div class="col-6"></div>
+                        <div class="col-3">
+                            <Button Class="btn btn-secondary form-control" onclick="@(() => CancelAdd())">
+                                Limpiar
+                            </Button>
+                        </div>
+                        <div class="col-3">
+                            <Button Class="btn btn-primary form-control" onclick="@(() => SaveAdd())">
+                                Crear
+                            </Button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </CardBody>
+    </Card>
+</Collapse>
+
+<br />
+<br />
+
+<Grid TItem="FeedbackStandar" @ref="grid"
+      Data="_standars"
+      Class="table table-hover table-bordered table-striped"
+      AllowSorting="true"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="8"
+      Responsive="true">
+
+    <GridColumn TItem="FeedbackStandar" HeaderText="Nombre" SortKeySelector="item => item.Name" PropertyName="Name" FilterOperator="FilterOperator.Contains">
+        @context.Name
+    </GridColumn>
+
+    <GridColumn TItem="FeedbackStandar" HeaderText="Descripción" SortKeySelector="item => item.Description" PropertyName="Detalle" FilterOperator="FilterOperator.Contains">
+        @context.Description
+    </GridColumn>
+
+    <GridColumn TItem="FeedbackStandar" HeaderText="Activo" Sortable="false" Filterable="false">
+        <div style="text-align: center;">
+            @if (context.Active.HasValue && context.Active.Value)
+            {
+                <span class="oi oi-circle-check" aria-hidden="true" style="color: var(--l-green)"></span>
+            }
+            else
+            {
+                <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-red)"></span>
+            }
+        </div>
+    </GridColumn>
+
+    <GridColumn TItem="FeedbackStandar" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="text-center">
+            <div class="d-inline-flex">
+                <Button @onclick="async () => await OnShowModalClick(context)">
+                    <span class="oi oi-pencil" aria-hidden="true" title="Editar"></span>
+                </Button>
+
+
+                <Button @onclick="async () => await ToggleActiveAsync(context)">
+                    @if (context != null && context.Active.HasValue)
+                    {
+                        if (context.Active.Value)
+                        {
+                            <span class="oi oi-circle-x" style="color: var(--l-red)" aria-hidden="true" title="Inhabilitar"></span>
+                        }
+                        else
+                        {
+                            <span class="oi oi-circle-check" style="color: var(--l-green)" aria-hidden="true" title="Habilitar"></span>
+                        }
+                    }
+                </Button>
+
+                <Button @onclick="async () => await SaveDefinitiveDelete(context.Id)">
+                    <span class="oi oi-trash" aria-hidden="true" title="Eliminar" style="color: var(--l-white)"></span>
+                </Button>
+            </div>
+        </div>
+    </GridColumn>
+</Grid>
+
+<Modal @ref="modal" Title="Editar Categoría" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h5><b>@editStandar.Name</b></h5>
+                <div style="display: none">
+                    @editStandar.Id
+                </div>
+            </div>
+        </div>
+
+
+        <div class="row mt-2">
+            <div class="col-2 mt-2">
+                Nombre
+            </div>
+            <div class="col-12">
+                <InputText Class="form-control" @bind-Value="@editStandar.Name"></InputText>
+            </div>
+        </div>
+
+        <div class="row mt-2">
+            <div class="col-2">
+                Descripción
+            </div>
+            <div class="col-12">
+                <textarea class="form-control" @bind="editStandar.Description" rows="4"></textarea>
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Cerrar</Button>
+        </div>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="SaveEdit">Guardar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+@code {
+    [Inject] private ToastService ToastService { get; set; }
+    [Inject] private PreloadService PreloadService { get; set; }
+
+    private Collapse collapseAgregar;
+    private Grid<FeedbackStandar> grid;
+
+    private Modal modal;
+
+    private FeedbackStandar editStandar { get; set; } = new FeedbackStandar();
+    private FeedbackStandar createStandar { get; set; } = new FeedbackStandar();
+
+    private List<FeedbackStandar> _standars = new List<FeedbackStandar>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        changedState.ChangeAction += StateHasChanged;
+
+        try
+        {
+            PreloadService.Show();
+
+            await GetGrid();
+        }
+        catch (Exception e)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+        finally
+        {
+            PreloadService.Hide();
+        }
+
+        await base.OnInitializedAsync();
+    }
+
+    public void Dispose()
+    {
+        changedState.ChangeAction -= StateHasChanged;
+    }
+
+    private async Task GetGrid()
+    {
+        _standars = await _standarService.GetAsync();
+    }
+
+    private async Task SaveAdd()
+    {
+        try
+        {
+            createStandar.Active = true;
+            await _standarService.AddAsync(createStandar);
+            createStandar = new FeedbackStandar();
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+
+            changedState.InitChanges();
+
+            CancelAdd();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con éxito",
+                    Title = "Agregar Standar"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private void CancelAdd()
+    {
+        createStandar.Name = "";
+        createStandar.Description = "";
+        createStandar.Active = false;
+    }
+
+    private async Task SaveEdit()
+    {
+        try
+        {
+            await _standarService.EditAsync(editStandar);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            await OnHideModalClick();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con exito",
+                    Title = "Editar Standar"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveDelete(long Id)
+    {
+        try
+        {
+            await _standarService.DeleteAsync(Id);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            await OnHideModalClick();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con exito",
+                    Title = "Eliminar Standar"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task OnShowModalClick(FeedbackStandar standar)
+    {
+        editStandar = standar;
+
+        await modal?.ShowAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        editStandar.Active = default;
+        await modal?.HideAsync();
+    }
+
+    private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
+
+    private async Task ToggleActiveAsync(FeedbackStandar feedbackstandar)
+    {
+        if (feedbackstandar == null) return;
+
+        feedbackstandar.Active = !(feedbackstandar.Active.HasValue && feedbackstandar.Active.Value);
+
+        try
+        {
+            await _standarService.EditAsync(feedbackstandar);
+
+            var action = feedbackstandar.Active.Value ? "Activo" : "Inactivo";
+            ToastService.Notify(new ToastMessage
+                {
+                    Type = ToastType.Success,
+                    Message = $"El periodo se encuentra {action}.",
+                    Title = "Estado Actualizado"
+                });
+
+            StateHasChanged();
+
+            await UpdateFeedbackUser();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task UpdateFeedbackUser()
+    {
+        _standars = await _standarService.GetAsync();
+    }
+
+    private async Task SaveDefinitiveDelete(long Id)
+    {
+        try
+        {
+            await _standarService.DefinitiveDeleteAsync(Id);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            await OnHideModalClick();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Eliminar Standar "
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error al borrar Standar ",
+                    Title = "Error"
+                });
+        }
+    }
+}

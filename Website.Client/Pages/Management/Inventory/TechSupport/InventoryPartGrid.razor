@@ -1,0 +1,516 @@
+﻿@using BlazorBootstrap;
+@using DataContext;
+@using DataModel.Enums;
+@using DataService.Auth;
+@using DataService.Interfaces.Management;
+@using DataService.State;
+@using System.Globalization;
+@using System.Text.RegularExpressions;
+
+@inherits InventoryPart
+
+@inject IJSRuntime JSRuntime
+@inject IAddModelService _AddModelService
+@inject IAddBrandService _AddBrandService
+
+@inject IInventoryLicenseService _inventoryLicenseService
+@inject IInventoryService _inventoryService
+@inject IInventoryPartsService _inventoryPartService
+@inject IInventoryPartTypeService _inventoryPartTypeService
+@inject IUserService _userService
+
+@inject AuthService _authService
+
+@inject NavigationManager uriHelper;
+
+@inject ChangedState changedState
+
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleContentAsync">Crear Pedido</Button>
+    </div>
+</div>
+
+<Collapse @ref="collapseAgregar" Class="custom-container">
+    <Card>
+        <CardBody>
+            <div class="row">
+                <div class="col-3">
+                    Seleccionar Laptop
+                </div>
+                <div class="col-3">
+                    Parte
+                </div>
+                <div class="col-3">
+                    Nombre de Parte
+                </div>
+                <div class="col-3">
+                    Serial de Parte
+                </div>
+
+            </div>
+            <div class="row mt-2">
+
+                <div class="col-3">
+                    <InputSelect class="form-select mt-1" @bind-Value="addSerialId">
+                        <option selected value=-1 disabled>Seleccione</option>
+                        @foreach (var u in _inventories)
+                        {
+                            @* <option value=@u.Id>@u.Model.BrandName, @u.Model.Name, ..@u.Serial.Substring(u.Serial.Length - 4) (@u.AssignedUser)</option>  *@                         
+                            <option value=@u.Id>Serial [ . . . @u.Serial.Substring(u.Serial.Length - 4) // @u.Model.BrandName, @u.Model.Name </option>
+                        }
+                    </InputSelect>
+                </div>
+
+                <div class="col-3">
+                    <InputSelect class="form-select mt-1" @bind-Value="addInventoryPart.PartTypeId">
+                        <option value="-1" selected disabled="@(addInventoryPartType.Id != -1)">Seleccione</option>
+                        @foreach (var p in _inventoryPartTypes)
+                        {
+                            <option value="@p.Id">@p.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+
+                <div class="col-3">
+                    <InputText class="form-control mt-1" @bind-Value="addInventoryPart.Name"></InputText>
+                </div>
+
+                <div class="col-3">
+                    <InputText class="form-control mt-1" @bind-Value="addInventoryPart.Serial"></InputText>
+                </div>
+            </div>
+
+            <br />
+
+            <div class="row">
+                <div class="col-3">
+                    Descripción <span class="text-muted small">(Defecto)</span>
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-6">
+                    <textarea class="form-control" rows="1" @bind="addInventoryPart.Description"></textarea>
+                </div>
+
+                <div class="col-3">
+                    <Button class="btn form-control" Color="ButtonColor.Secondary" onclick="@(() => CancelAdd())">
+                        Limpiar
+                    </Button>
+                </div>
+
+                <div class="col-3">
+                    <Button class="btn form-control" Color="ButtonColor.Primary" onclick="@(() => SaveAdd())">
+                        Crear
+                    </Button>
+                </div>
+
+            </div>
+            <br />
+        </CardBody>
+    </Card>
+</Collapse>
+<br />
+
+<Grid TItem="DataContext.InventoryPart" @ref="grid"
+      Data="_inventoryParts"
+      Class="table table-hover table-bordered table-striped text-nowrap"
+      AllowSorting="true"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="8"
+      Responsive="true"
+      Unit="Unit.Px">
+
+    <GridColumn TItem="DataContext.InventoryPart" HeaderText="Nombre de Parte" SortKeySelector="item => item.Name" PropertyName="Name" FilterOperator=" FilterOperator.Contains">
+        @context.Name
+    </GridColumn>
+
+    <GridColumn TItem="DataContext.InventoryPart" HeaderText="Serial de Parte" SortKeySelector="item => item.Serial" PropertyName="Name" FilterOperator=" FilterOperator.Contains">
+        @context.Serial
+    </GridColumn>
+
+    <GridColumn TItem="DataContext.InventoryPart" HeaderText="Activo" PropertyName="Active">
+        @if (context.Active.HasValue && context.Active.Value)
+        {
+            <span class="oi oi-circle-check" aria-hidden="true" style="color: var(--l-green)"></span>
+        }
+        else
+        {
+            <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-red)"></span>
+        }
+    </GridColumn>
+
+    <GridColumn TItem="DataContext.InventoryPart" SortKeySelector="item => item.Description" HeaderText="Descripción" FilterOperator="FilterOperator.Contains">
+        @context.Description
+    </GridColumn>
+
+    <GridColumn TItem="DataContext.InventoryPart" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="row">
+            <div class="col-12 d-flex">
+
+                <Button @onclick="async () => await OnShowModalEditClick(context)">
+                    <span class="oi oi-pencil" aria-hidden="true" title="Editar"></span>
+                </Button>
+
+                <Button @onclick="async () => await ToggleActiveAsync(context)">
+                    @if (context != null && context.Active.HasValue)
+                    {
+                        if (context.Active.Value)
+                        {
+                            <span class="oi oi-circle-x icon-active" aria-hidden="true" title="Inhabilitar"></span>
+                        }
+                        else
+                        {
+                            <span class="oi oi-circle-check icon-inactive" aria-hidden="true" title="Habilitar"></span>
+                        }
+                    }
+                </Button>
+
+                <Button @onclick="async () => await SaveDefinitiveDelete(context.Id)">
+                    <span class="oi oi-trash" aria-hidden="true" title="Eliminar"></span>
+                </Button>
+            </div>
+        </div>
+    </GridColumn>
+</Grid>
+
+
+
+<ConfirmDialog @ref="dialog" />
+
+<Modal @ref="modalEdit" Title="Editar Laptop" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h4>@editInventoryPart.Name</h4>
+                <div style="display: none">
+                    @editInventoryPart.Id
+                </div>
+            </div>
+        </div>
+
+        <div class="row pt-2">
+            <div class="col-4 d-flex align-items-center">
+                Tipo de Parte
+            </div>
+            <div class="col-8">
+                <InputSelect class="form-select" @bind-Value="editInventoryPart.PartTypeId">
+                    <option value="-1" disabled="@(addInventoryPartType.Id != -1)">Seleccione</option>
+                    @foreach (var p in _inventoryPartTypes)
+                    {
+                        <option value="@p.Id">@p.Name</option>
+                    }
+                </InputSelect>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-4 d-flex align-items-center">
+                Nombre de Parte
+            </div>
+            <div class="col-8">
+                <InputText Class="form-control" @bind-Value="@editInventoryPart.Name"></InputText>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-4 d-flex align-items-center">
+                Descripcion
+            </div>
+            <div class="col-8">
+                <textarea class="form-control" rows="3" @bind="@editInventoryPart.Description"></textarea>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-4 d-flex align-items-center">
+                Serial
+            </div>
+            <div class="col-8">
+                <InputText Class="form-control" @bind-Value="@editInventoryPart.Serial"></InputText>
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalEditClick">Cerrar</Button>
+        </div>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="SaveEdit">Guardar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+@code
+{
+    [Inject] ToastService ToastService { get; set; }
+    private ConfirmDialog dialog;
+    private Collapse collapseAgregar;
+    private Grid<DataContext.InventoryPart> grid;
+    private Modal modalEdit;
+
+   
+    private long addSerialId { get; set; } = -1;
+
+    private List<DataContext.User> _users = new List<DataContext.User>();
+    private DataContext.InventoryPart addInventoryPart { get; set; } = new DataContext.InventoryPart();
+    private DataContext.InventoryPart editInventoryPart { get; set; } = new DataContext.InventoryPart();
+
+    private DataContext.InventoryPartType addInventoryPartType { get; set; } = new DataContext.InventoryPartType();
+    private DataContext.InventoryPartType editInventoryPartType { get; set; } = new DataContext.InventoryPartType();
+
+    private List<DataContext.Inventory> _inventories = new List<DataContext.Inventory>();
+
+
+    private List<DataContext.InventoryPart> _inventoryParts = new List<DataContext.InventoryPart>();
+    private List<DataContext.InventoryPartType> _inventoryPartTypes = new List<DataContext.InventoryPartType>();
+
+
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await GetGrid();
+        await GetCombos();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        changedState.ChangeAction += StateHasChanged;
+        await GetGrid();
+        await GetCombos();
+        await base.OnInitializedAsync();
+    }
+
+    public void Dispose()
+    {
+        changedState.ChangeAction -= StateHasChanged;
+    }
+
+    private async Task GetCombos()
+    {
+        try
+        {
+            _users = (await _inventoryPartService.GetUsersWithPcRepairAsync()).Where(x => x.IsActive).ToList();
+            _inventoryParts = await _inventoryPartService.GetAsync();
+            _inventoryPartTypes = await _inventoryPartTypeService.GetAsync();
+            _inventories = await _inventoryPartService.GetSerialAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task GetGrid()
+    {
+        try
+        {
+            _inventoryParts = (await _inventoryPartService.GetAsync()).OrderBy(x => x.Id).ToList();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveAdd()
+    {
+        try
+        {
+            await _inventoryPartService.AddAsync(addInventoryPart);
+
+            StateHasChanged();
+            changedState.InitChanges();
+            await GetGrid();
+
+            CancelAdd();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con exito",
+                    Title = "Agregar Pedido"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task DeleteActive(long id)
+    {
+        try
+        {
+
+            await _inventoryPartService.DeleteAsync(id);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito",
+                    Title = "Eliminar Pedido"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error al borrar modelo ",
+                    Title = "Error"
+                });
+        }
+
+    }
+
+    private void CancelAdd()
+    {
+        addInventoryPart = new DataContext.InventoryPart();
+        addInventoryPart.PartTypeId = -1;
+
+    }
+
+    private async Task OnShowModalEditClick(DataContext.InventoryPart inventoryPart)
+    {
+        editInventoryPart = inventoryPart;
+        await modalEdit?.ShowAsync();
+    }
+
+    private async Task OnHideModalEditClick()
+    {
+
+        await modalEdit.HideAsync();
+    }
+
+    private async Task SaveEdit()
+    {
+        try
+        {
+            await _inventoryPartService.EditAsync(editInventoryPart);
+
+            StateHasChanged();
+
+            await grid.RefreshDataAsync();
+            await GetGrid();
+            await OnHideModalEditClick();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con exito",
+                    Title = "Editar Pedido"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
+
+   
+
+    private async Task SaveDefinitiveDelete(long Id)
+    {
+        try
+        {
+            await _inventoryPartService.DefinitiveDeleteAsync(Id);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Eliminar Pedido"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error al borrar Pedido",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task ToggleActiveAsync(DataContext.InventoryPart inventoryPart)
+    {
+        if (inventoryPart == null) return;
+
+        inventoryPart.Active = !(inventoryPart.Active.HasValue && inventoryPart.Active.Value);
+
+        try
+        {
+            await _inventoryPartService.EditAsync(inventoryPart);
+
+            var action = inventoryPart.Active.Value ? "Activo" : "Inactivo";
+            ToastService.Notify(new ToastMessage
+                {
+                    Type = ToastType.Success,
+                    Message = $"El Pedido se encuentra {action}.",
+                    Title = "Pedido Actualizado"
+                });
+
+            await UpdateInventoryPart();
+            await grid.RefreshDataAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task UpdateInventoryPart()
+    {
+        _inventoryParts = await _inventoryPartService.GetAsync();
+    }
+
+
+    protected override void OnInitialized()
+    {
+
+        addInventoryPartType.Id = -1;
+        editInventoryPartType.Id = -1;
+
+
+        base.OnInitialized();
+    }
+
+}

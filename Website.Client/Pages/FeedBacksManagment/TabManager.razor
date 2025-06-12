@@ -1,0 +1,76 @@
+﻿@using BlazorBootstrap;
+@using DataService.Auth;
+@using DataService.State;
+@using Website.Client.Pages.FeedBacksManagment.Improvement
+@using Website.Client.Pages.FeedBacksManagment.Item
+@using Website.Client.Pages.FeedBacksManagment.Standar
+@using Website.Client.Pages.FeedBacksManagment.Period
+@using Website.Client.Pages.FeedBacksManagment.StandarType
+
+
+
+@inject AuthService _authService
+@inject ChangedState changedState
+
+@implements IDisposable
+@inject ChangedState changedState
+
+<BlazorBootstrap.Tabs EnableFadeEffect="true" OnShowing="@(args => OnTabShowingAsync(args))">
+    
+    <BlazorBootstrap.Tab Title="Histórico" LazyLoad="true" IsActive="true">
+        <Content>
+            <Period />
+        </Content>
+    </BlazorBootstrap.Tab>
+
+    @if (_authService.User.ProfileId == (long)DataModel.Enums.ProfileTypes.Administrador)
+    {
+        <BlazorBootstrap.Tab Title="Categorías" LazyLoad="true">
+            <Content>
+                <Standar />
+            </Content>
+        </BlazorBootstrap.Tab>
+
+        <BlazorBootstrap.Tab Title="Punto de Evaluación" LazyLoad="true">
+            <Content>
+                <Item />
+            </Content>
+        </BlazorBootstrap.Tab>
+
+        <BlazorBootstrap.Tab Title="Criterios" LazyLoad="true">
+            <Content>
+                <StandarType />
+            </Content>
+        </BlazorBootstrap.Tab>
+
+        <BlazorBootstrap.Tab Title="Áreas de Mejora" LazyLoad="true">
+            <Content>
+                <Improvement />
+            </Content>
+        </BlazorBootstrap.Tab>
+    }
+</BlazorBootstrap.Tabs>
+
+<div class="row tabRelleno" style="height:80px">
+    <div class="col-12">
+
+    </div>
+</div> 
+
+@code 
+{
+    protected override void OnInitialized()
+    {
+        changedState.ChangeAction += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        changedState.ChangeAction -= StateHasChanged;
+    }
+
+    private void OnTabShowingAsync(TabsEventArgs args)
+    {
+        changedState.InitChanges();
+    }
+}

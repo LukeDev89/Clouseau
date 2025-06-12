@@ -1,0 +1,780 @@
+﻿@using BlazorBootstrap
+@using DataContext
+@using DataModel.Dto;
+@using DataModel.Enums
+@using DataModel.Request;
+@using DataService.Auth;
+@using DataService.Interfaces.Management;
+@using System.Globalization;
+@using DataService.Interfaces.ProjectManagement;
+
+@inherits TimeRecord
+
+@inject IProjectTaskService _projectTaskService
+@inject ITaskProgressService _taskProgressService
+@inject ITaskTypeService _taskTypeService
+@inject IUserService _userService
+@inject AuthService _authService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+@inject NavigationManager navigationManager;
+
+@if (!string.IsNullOrEmpty(_incompleteHoursMessage))
+{
+    <div class="row">
+        <div class="col-12">
+            <Alert Color="AlertColor.Warning">
+                <Icon Name="IconName.ExclamationTriangleFill" class="me-2"></Icon><strong>@((MarkupString)_authService.IncompleteHoursMessage)</strong>
+            </Alert>
+        </div>
+    </div>
+    <br />
+}
+
+<div class="row">
+    <div class="col-12">
+        <div class="row">
+            <div class="col-2 d-flex justify-content-start align-items-center">
+                <DateInput Style="display: none" Class="form-control" Disabled="false" TValue="DateOnly" Value="filterDate" ValueExpression="() => filterDate" ValueChanged="async (value) => await OnFilterDateChanged(value)"></DateInput>
+                <span style="text-align: center; vertical-align: middle">
+                    @filterDate.ToString("MMMM", CultureInfo.CreateSpecificCulture("es")).ToUpper() @filterDate.Year
+                </span>
+            </div>
+            <div class="col-1">
+                <Button Style="width: 100%" @onclick="() => ChangeDateLess()">
+                    <span class="oi oi-chevron-left" aria-hidden="true" title="Atras"></span>
+                </Button>
+            </div>
+            <div class="col-1">
+                <Button Style="width: 100%" @onclick="() => ChangeDatePlus()">
+                    <span class="oi oi-chevron-right" aria-hidden="true" title="Adelante"></span>
+                </Button>
+            </div>
+            <div class="col-6">
+            </div>
+            <div class="col-2">
+            </div>
+        </div>
+    </div>
+</div>
+
+<br />
+
+<div class="row" style="overflow: auto;">
+    <div class="col-12">
+        <table class="table table-hover table-bordered table-striped text-nowrap sticky-table">
+            <thead style="position: sticky; top: 0; background-color: #31404d; text-align: right; z-index: 1000;">
+                <tr>
+                    <th>Tarea</th>
+                    <th>CECO</th>
+                    <th>Tipo</th>
+                    @foreach (var d in _daysToShow)
+                    {
+                        <th>
+                            @d.ToString("dd")
+                        </th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var taskEntry in _workPerTaskToShow
+                .GroupBy(x => new { x.Task, x.TaskType })
+                .Select(g => g.First())
+                .OrderBy(x => x.Project)
+                .ToList())
+                {
+                    <tr>
+                        <td title="@taskEntry.Task" style="max-width: 30ch; overflow: hidden; text-overflow: ellipsis;">
+                            @if (taskEntry.Task.Length > 21)
+                            {
+                                @(taskEntry.Task.Substring(0, 17) + "...")
+                            }
+                            else
+                            {
+                                @taskEntry.Task
+                            }
+                        </td>
+                        <td>@taskEntry.Project</td>
+                        <td>@taskEntry.TaskType</td>
+                        @foreach (var date in _daysToShow)
+                        {
+                            <td align="right">
+                                @{
+                                    var hoursForDate = _workPerTaskToShow
+                                    .Where(x => x.Date == date && x.Task == taskEntry.Task && x.TaskType == taskEntry.TaskType)
+                                    .Sum(x => x.Hours);
+                                }
+                                @hoursForDate
+                            </td>
+                        }
+                    </tr>
+                }
+                <tr>
+                    <td></td>
+                    <td colspan="2" align="right"><strong>Total Horas por Día</strong></td>
+                    @foreach (var date in _daysToShow)
+                    {
+                        var total = _workPerTaskToShow.Where(x => x.Date == date).Sum(x => x.Hours);
+
+                        string statusColor;
+                        string moodFace;
+
+                        if (total >= 8)
+                        {
+                            statusColor = "var(--l-green)";
+                            moodFace = "sentiment_very_satisfied";
+                        }
+                        else if (total > 0)
+                        {
+                            statusColor = "var(--l-yellow)";
+                            moodFace = "sentiment_neutral";
+                        }
+                        else
+                        {
+                            statusColor = "var(--l-red)";
+                            moodFace = "sentiment_very_dissatisfied";
+                        }
+
+                        <td align="right">
+                            <div style="margin: auto; text-align: center; vertical-align: middle; display: flex; align-items: center; justify-content: end">
+                                <strong>
+                                    &nbsp;&nbsp; @total
+                                </strong>
+                            </div>
+                            <div style="width: 50px; height: 2px; background-color: @statusColor">
+                            </div>
+                        </td>
+                    }
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<br />
+
+<h5>Lista de Tareas</h5>
+
+<br />
+
+<Grid TItem="ProjectTask" @ref="grid"
+      Data="_projectTaskToShow"
+      Class="table table-hover table-bordered table-striped text-nowrap"
+      AllowSorting="true"
+      AllowFiltering="true"
+      Responsive="true"
+      Unit="Unit.Px">
+
+    <GridColumn TItem="ProjectTask" HeaderText="CECO" SortKeySelector="item => item.ProjectName" PropertyName="ProjectName" FilterOperator="FilterOperator.Contains">
+        @context.ProjectName
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="Titulo" TextNoWrap="true" SortKeySelector="item => item.Name" PropertyName="Name" FilterOperator="FilterOperator.Contains">
+        <div title="@context.Name" style="max-width: 21ch; overflow: hidden; text-overflow: ellipsis;">
+            @if (context.Name.Length > 21)
+            {
+                @(context.Name.Substring(0, 17) + "...")
+            }
+            else
+            {
+                @context.Name
+            }
+        </div>
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="Descripción" TextNoWrap="true" SortKeySelector="item => item.Description" PropertyName="Description" FilterOperator="FilterOperator.Contains">
+        @{
+            // Mostrar solo los primeros 30 caracteres si el texto supera los 70 caracteres.
+            var displayText = context.Description.Length > 70
+            ? context.Description.Substring(0, 70) + "..."
+            : context.Description;
+        }
+        @displayText
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="Horas" TextAlignment="Alignment.End" Sortable="false" PropertyName="Completed" Filterable="false">
+        @context.TaskProgresses.Where(u => u.UserId == _authService.User.Id).Sum(x => x.Hours)
+
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="Periodo" SortKeySelector="item => item._CreationDate" PropertyName="_Date" Filterable="false">
+        @context._CreationDate.ToString("MM/yyyy")
+    </GridColumn>
+
+    <GridColumn TItem="ProjectTask" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="row">
+            <div class="col-12 d-flex">
+                @if (!context.Finished)
+                {
+                    <Button @onclick="async () => await OnShowModalClick(context)">
+                        <span class="oi oi-clock" aria-hidden="true" title="Imputar Horas"></span>
+                    </Button>
+                }
+
+                <Button @onclick="async () => await OnShowModalHistoryClick(context)">
+                    <span class="oi oi-magnifying-glass" aria-hidden="true" title="Ver Historial"></span>
+                </Button>
+            </div>
+        </div>
+    </GridColumn>
+</Grid>
+
+<br />
+
+<Modal @ref="modal" Title="Imputar Horas" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h4><b>@modalName</b></h4>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-12">
+                <p>@modalDescription</p>
+            </div>
+        </div>
+        <div class="row pt-3">
+            <div class="col-4">
+                Usuario
+            </div>
+            <div class="col-4">
+                <InputSelect class="form-select" @bind-Value="modalUser">
+                    @if (_users.Count > 1)
+                    {
+                        <option selected value=-1 disabled>Seleccione</option>
+
+                        foreach (var u in _users)
+                        {
+                            <option value=@u.Id>@u.Username</option>
+                        }
+                    }
+                    else
+                    {
+                        <option selected value=@_authService.User.Id>@_authService.User.UserFullName</option>
+                    }
+                </InputSelect>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-4">
+                Día
+            </div>
+            <div class="col-4">
+                <DateInput Class="form-control" @bind-Value="@modalDate"></DateInput>
+            </div>
+            <div class="col-4">
+                <DateInput Class="form-control" @bind-Value="@modalDateTo" disabled="@dateToDisabled"></DateInput>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-4">
+                Tipo de Imputación
+            </div>
+            <div class="col-4">
+                <InputSelect class="form-select" @bind-Value="modalTaskType" disabled="@taskTypeDisabled">
+                    <option selected value=-1 disabled>Seleccione</option>
+                    @foreach (var p in _taskTypes.Where(x => !x.Name.Contains("ndefinid")))
+                    {
+                        <option value=@p.Id>@p.Name</option>
+                    }
+                </InputSelect>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-4">
+                Horas
+            </div>
+            <div class="col-4">
+                <InputNumber Class="form-control" Min="1" Max="180" Step="0.01" @bind-Value="@modalHours" />
+            </div>
+            @if (dateToDisabled)
+            {
+                <div class="col-4 d-flex align-items-center">
+                    @modalHours Hora(s)
+                </div>
+            }
+        </div>
+        <div class="row pt-2">
+            <div class="col-4">
+                Comentarios
+            </div>
+            <div class="col-8">
+                <InputText Class="form-control" @bind-Value="@modalComment"></InputText>
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Cerrar</Button>
+        </div>
+        <div class="col-3">
+            <Button @ref="buttonSave" Class="btn form-control" Color="ButtonColor.Primary" @onclick="SaveModalHours" disabled="@preventDoubleClick">Guardar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+<Modal @ref="modalHistory" Title="Ver Historial" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h4><b>@modalName</b></h4>
+            </div>
+        </div>
+        <div class="row pt-1">
+            <div class="col-12">
+                <p>@modalDescription</p>
+            </div>
+        </div>
+
+        <div class="row pt-3">
+            <div class="col-12" style="overflow: auto; margin-bottom: 10px">
+                @foreach (var c in _taskProgress.OrderByDescending(x => x.Date))
+                {
+                    <div class="row history-container">
+                        <div class="col-12">
+                            <div class="row" style="margin-top: 10px">
+                                <div class="col-12 d-flex align-items-center justify-content-end">
+                                    <Button @onclick="async () => await OnEditHour(c)" Style="border: none 1px var(--l-grey); border-radius: 60px; padding: 0px 3px 0px 5px">
+                                        <span class="oi oi-pencil" aria-hidden="true" title="Editar Hora"></span>
+                                    </Button>
+                                    <Button @onclick="async () => await OnDeleteHour(c.Id)" Style="margin-left: 15px; border: none 1px var(--l-grey); border-radius: 60px; padding: 0px 3px 0px 5px">
+                                        <span class="oi oi-trash" aria-hidden="true" title="Eliminar Hora"></span>
+                                    </Button>
+                                </div>
+                            </div>
+                            <div class="row" style="margin-top: 10px">
+                                <div class="col-4 d-flex align-items-center">
+                                    <b>@c.User.Username</b>
+                                </div>
+                                <div class="col-8 d-flex align-items-center justify-content-end">
+                                    <b>@c.TaskType.Name</b>&nbsp; @c.Date.ToString("dd/MM/yyyy HH:mm")
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="row" style="margin-top: 10px; margin-bottom: 10px">
+                                <div class="col-10">
+                                    @c.Comment
+                                </div>
+                                <div class="col-2 d-flex align-items-center justify-content-end">
+                                    @c.Hours
+                                    @if (c.Hours == 1)
+                                    {
+                                        <span style="margin: 0; padding: 0">&nbsp;Hora</span>
+                                    }
+                                    else
+                                    {
+                                        <span>&nbsp;Horas</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Cerrar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+@code {
+    [Inject] ToastService ToastService { get; set; }
+    [Inject] protected PreloadService PreloadService { get; set; }
+
+    private Modal modal = default!;
+    private Modal modalHistory = default!;
+    private Grid<ProjectTask> grid = default!;
+    private Button buttonSave = default!;
+
+    private List<ProjectTask> _projectTask = new List<ProjectTask>();
+    private List<ProjectTask> _projectTaskToShow = new List<ProjectTask>();
+
+    private List<TaskProgress> _taskProgress = new List<TaskProgress>();
+    private List<TaskType> _taskTypes = new List<TaskType>();
+
+    private List<HoursPerDayModel> _workDays = new List<HoursPerDayModel>();
+    private List<HoursPerDayModel> _workDaysToShow = new List<HoursPerDayModel>();
+
+    private List<HoursPerTaskPerDayModel> _workPerTask = new List<HoursPerTaskPerDayModel>();
+    private List<HoursPerTaskPerDayModel> _workPerTaskToShow = new List<HoursPerTaskPerDayModel>();
+    private List<DateOnly> _daysToShow = new List<DateOnly>();
+
+    private string _incompleteHoursMessage = "";
+
+    private List<User> _users = new List<User>();
+
+    public long modalTaskId { get; set; }
+    public long modalProgressId { get; set; }
+    public long modalTaskType { get; set; } = -1;
+    public long modalUser { get; set; } = -1;
+    public string modalName { get; set; } = "";
+    public string modalDescription { get; set; } = "";
+    public string modalComment { get; set; } = "";
+    public DateTime modalDate { get; set; } = DateTime.Now;
+    public DateTime? modalDateTo { get; set; } = null;
+    public decimal modalHours = 1;
+
+    private bool taskTypeDisabled { get; set; }
+    private bool dateToDisabled { get; set; }
+
+    private bool isEdit { get; set; } = false;
+
+    private DateOnly filterDate = DateOnly.FromDateTime(DateTime.Today);
+
+    private bool _errorOccurred = false;
+    private DateOnly _firstDayOfMonth = new DateOnly(DateTime.Now.Year, DateTime.Now.Month, 1);
+
+    private bool preventDoubleClick { get; set; } = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (_errorOccurred)
+            {
+                await localStorage.ClearAsync();
+
+                ToastService.Notify(new ToastMessage()
+                    {
+                        Type = ToastType.Danger,
+                        Message = "Error inesperado al realizar la acción",
+                        Title = "Error"
+                    });
+
+                navigationManager.NavigateTo("/");
+            }
+            else
+            {
+                if (!_authService.IsLoggedIn)
+                {
+                    navigationManager.NavigateTo("/");
+                }
+                else
+                {
+                    var uri = navigationManager.Uri;
+                    await localStorage.SetItemAsync("lastUrl", uri);
+                    await localStorage.SetItemAsync("huboRecarga", false);
+                }
+            }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            PreloadService.Show();
+
+            await GetGrid();
+            await GetCombo();
+
+            await base.OnInitializedAsync();
+
+            modalUser = _authService.User.Id;
+        }
+        catch (Exception ex)
+        {
+            _errorOccurred = true;
+        }
+        finally
+        {
+            PreloadService.Hide();
+        }
+    }
+
+    private async Task GetCombo()
+    {
+        _taskTypes = await _taskTypeService.GetAsync();
+
+        _users = _authService.User.ProfileId == (long)ProfileTypes.Administrador
+           ? await _userService.GetAsync()
+           : _authService.User.ProfileId == (long)ProfileTypes.GestorProyectos
+               ? (await _userService.GetAsync())
+                   .Where(u => u.UserTeams
+                       .Any(ut => _authService.User.UserTeams
+                           .Any(loggedTeam => loggedTeam.TeamId == ut.TeamId)))
+                   .ToList()
+               : new List<User> { _authService.User };
+    }
+
+    private async Task GetGrid(bool force = false)
+    {
+        try
+        {
+            var pt = _projectTaskService.GetByUserIdAsync(_authService.User.Id);
+            var wp = _projectTaskService.UserCalendarPerTask(_authService.User.Id, force);
+
+            await Task.WhenAll(pt, wp);
+
+            _projectTask = await pt;
+            _workDays = _authService.UserCalendar;
+            _workPerTask = await wp;
+
+            _incompleteHoursMessage = _authService.IncompleteHoursMessage;
+
+            CalculateTables();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private void CalculateTables()
+    {
+        _projectTaskToShow = _projectTask.Where(x =>
+            ((x.CreationDate.Month == filterDate.Month && x.CreationDate.Year == filterDate.Year) ||
+            (!x.Finished && DateOnly.FromDateTime(x.CreationDate) <= filterDate))).ToList();
+
+        _workPerTaskToShow = _workPerTask.Where(x => x.Date.Month == filterDate.Month && x.Date.Year == filterDate.Year).OrderBy(x => x.Date).ToList();
+
+        _workDaysToShow = _workDays.Where(x => x.Date.Month == filterDate.Month && x.Date.Year == filterDate.Year).ToList();
+        _daysToShow = _workDays.Select(x => x.Date).Where(x => x.Month == filterDate.Month && x.Year == filterDate.Year).Distinct().OrderBy(x => x).ToList();
+    }
+
+    private async Task SaveModalHours()
+    {
+        try
+        {
+            preventDoubleClick = true;
+            buttonSave.ShowLoading();
+
+            if (modalHours == 0) { ShowError("Carga de Horas", "Las horas deben ser mayor que 0"); return; }
+            if (modalDate > DateTime.Now) { ShowError("Carga de Horas", "La fecha debe ser menor o igual a hoy"); return; }
+            if (modalTaskType == -1) { ShowError("Carga de Horas", "Debe seleccionar un tipo de tarea"); return; }
+
+            var reunion = _taskTypes.First(x => x.Name.Contains("Reun"));
+
+            if (modalTaskType == reunion.Id && string.IsNullOrEmpty(modalComment)) { ShowError("Carga de Horas", "Al tratarse de una Reunión, el campo comentario es obligatorio"); return; }
+
+            if (modalDateTo.HasValue)
+            {
+                if (modalDateTo.Value.Date < modalDate.Date)
+                {
+                    ToastService.Notify(new ToastMessage()
+                        {
+                            Type = ToastType.Danger,
+                            Message = $"La fecha final no puede ser menor a la fecha inicial.",
+                            Title = "Carga de Horas"
+                        });
+
+                    return;
+                }
+
+                var list = new List<TaskProgressRequest>();
+
+                for (var day = modalDate.Date; day.Date <= modalDateTo.Value.Date; day = day.AddDays(1))
+                {
+                    if (!_workDays.Select(x => x.Date).ToList()
+                        .Contains(DateOnly.FromDateTime(day))) continue;
+
+                    list.Add(new TaskProgressRequest()
+                        {
+                            TaskId = modalTaskId,
+                            UserId = modalUser,
+                            Hours = (decimal)modalHours,
+                            Comment = modalComment,
+                            TaskTypeId = modalTaskType,
+                            Date = day
+                        });
+                }
+
+                await _taskProgressService.AddAsync(list);
+            }
+            else
+            {
+                // Al comentar la linea de abajo, se permite cargar horas en días no laborales
+                // if (!_workDays.Select(x => x.Date).ToList().Contains(DateOnly.FromDateTime(modalDate))) return;
+
+                var request = new List<TaskProgressRequest>()
+                {
+                    new TaskProgressRequest()
+                    {
+                        TaskId = modalTaskId,
+                        UserId = modalUser,
+                        Hours = (decimal)modalHours,
+                        Comment = modalComment,
+                        TaskTypeId = modalTaskType,
+                        Date = modalDate,
+
+                        ProgressId = modalProgressId
+                    }
+                };
+
+                if (!isEdit)
+                {
+                    await _taskProgressService.AddAsync(request);
+                }
+                else
+                {
+                    await _taskProgressService.EditAsync(request);
+                }
+
+            }
+
+            modalTaskType = -1;
+            modalHours = 1.00M;
+            modalComment = "";
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Horas cargadas con éxito.",
+                    Title = "Imputación de Horas"
+                });
+
+            await _authService.UpdateHours(_authService.User.Id);
+            await GetGrid(true);
+            await grid.RefreshDataAsync();
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+        finally
+        {
+            preventDoubleClick = false;
+            buttonSave.HideLoading();
+        }
+    }
+
+    private async Task OnShowModalClick(ProjectTask task)
+    {
+        modalTaskId = task.Id;
+        modalName = task.Name;
+        modalDescription = task.Description;
+
+        modalProgressId = 0;
+        dateToDisabled = false;
+        isEdit = false;
+
+        if (task.TaskTypeId.HasValue)
+        {
+            modalTaskType = task.TaskTypeId.Value;
+            taskTypeDisabled = true;
+        }
+        else
+        {
+            modalTaskType = -1;
+            taskTypeDisabled = false;
+        }
+
+        await modal?.ShowAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        modalTaskId = 0;
+        modalTaskType = -1;
+        modalName = "";
+        modalDescription = "";
+        modalHours = 1.00M;
+        modalComment = "";
+        modalDate = DateTime.Now;
+        modalDateTo = null;
+
+        await modal?.HideAsync();
+        await modalHistory?.HideAsync();
+    }
+
+    private async Task OnShowModalHistoryClick(ProjectTask task)
+    {
+        modalTaskId = task.Id;
+        modalName = task.Name;
+        modalDescription = task.Description;
+
+        _taskProgress = (await _taskProgressService.GetByTaskIdAsync(task.Id))
+                            .Where(x => x.UserId == _authService.User.Id).ToList();
+
+        await modalHistory?.ShowAsync();
+    }
+
+    private async Task OnFilterDateChanged(DateOnly date)
+    {
+        filterDate = date;
+
+        CalculateTables();
+
+        if (grid != null)
+        {
+            await grid.RefreshDataAsync();
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task OnDeleteHour(long id)
+    {
+        try
+        {
+            await _taskProgressService.DeletHourById(id);
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Hora eliminada con éxito.",
+                    Title = "Imputación de Horas"
+                });
+
+            await _authService.UpdateHours(_authService.User.Id);
+            await GetGrid(true);
+            await grid.RefreshDataAsync();
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task OnEditHour(TaskProgress task)
+    {
+        modalTaskId = task.TaskId;
+        modalDate = task.Date;
+        modalHours = task.Hours;
+        modalComment = task.Comment;
+        modalTaskType = task.TaskTypeId;
+
+        modalProgressId = task.Id;
+
+        dateToDisabled = true;
+        isEdit = true;
+
+        await modalHistory?.HideAsync();
+        await modal?.ShowAsync();
+    }
+
+    private void ChangeDatePlus() => filterDate = filterDate.AddMonths(1);
+    private void ChangeDateLess() => filterDate = filterDate.AddMonths(-1);
+
+    private void ShowError(string title, string message)
+    {
+        ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Danger,
+                Message = message,
+                Title = title
+            });
+    }
+}

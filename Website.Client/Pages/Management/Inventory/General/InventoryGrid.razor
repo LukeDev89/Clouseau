@@ -1,0 +1,789 @@
+﻿@using BlazorBootstrap;
+@using DataContext;
+@using DataModel.Enums;
+@using DataService.Auth;
+@using DataService.Interfaces.Management;
+@using DataService.State;
+@using System.Globalization;
+@using System.Text.RegularExpressions;
+
+@inherits Inventory
+
+@inject IJSRuntime JSRuntime
+@inject IInventoryService _InventoryService
+
+@inject AuthService _authService
+
+@inject NavigationManager uriHelper;
+@implements IDisposable
+@inject ChangedState changedState
+
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <Button Class="form-control" Type="ButtonType.Button" Color="ButtonColor.Primary" @onclick="ToggleContentAsync">Crear Nuevo Equipo</Button>
+    </div>
+</div>
+<Collapse @ref="collapseAgregar" Class="custom-container">
+    <Card>
+        <CardBody>
+            <div class="row">
+                <div class="col-3">
+                    Marca
+                </div>
+                <div class="col-3">
+                    Modelo
+                </div>
+                <div class="col-3">
+                    Serial
+                </div>
+                <div class="col-3">
+                    Almacenamiento
+                </div>
+
+            </div>
+            <div class="row mt-2">
+                <div class="col-3">
+                    <InputSelect class="form-select" @bind-Value="addBrand.Id" @oninput="FilterModels">
+                        <option value="-1" disabled="@(addBrand.Id!= -1)">Seleccione</option>
+                        @foreach (var p in _Brands)
+                        {
+                            <option value="@p.Id">@p.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-3">
+                    <InputSelect class="form-select" @bind-Value="addInventory.ModelId">
+                        <option value="-1" disabled="@(addInventory.ModelId!= -1)">Seleccione</option>
+                        @if (_filteredModels != null && _filteredModels.Count > 0)
+                        {
+                            @foreach (var p in _filteredModels)
+                            {
+                                <option value="@p.Id">@p.Name</option>
+                            }
+                        }
+                        else
+                        {
+                            <option value="-1" disabled="true">No hay modelos disponibles</option>
+                        }
+                    </InputSelect>
+                </div>
+
+                <div class="col-3">
+                    <input type="text" class="form-control" @bind="addInventory.Serial" />
+                </div>
+
+                <div class="col-3">
+                    <input type="text" class="form-control" @bind="addInventory.Storage" />
+                </div>
+            </div>
+
+            <br />
+
+            <div class="row">
+                <div class="col-3">
+                    Procesador
+                </div>
+                <div class="col-3">
+                    Memoria
+                </div>
+
+                <div class="col-3">
+                </div>
+                <div class="col-3">
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-3">
+                    <input type="text" class="form-control" @bind="addInventory.Processor" />
+                </div>
+                <div class="col-3">
+                    <input type="text" class="form-control" @bind="addInventory.Memory" />
+                </div>
+                <div class="col-3">
+                    <Button class="btn btn-secondary form-control" onclick="@(() => CancelAdd())">
+                        Limpiar
+                    </Button>
+                </div>
+
+                <div class="col-3">
+                    <div class="row">
+                        <div class="col-6">
+                            <Button class="btn btn-primary form-control" onclick="@(() => SaveAdd())">
+                                Crear
+                            </Button>
+                        </div>
+                        <div class="col-6">
+                            <Button class="btn btn-primary form-control" onclick="@(() => SaveAddMultiple())">
+                                Crear Otro
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <br />
+        </CardBody>
+    </Card>
+</Collapse>
+<br />
+<br />
+
+<Grid TItem="DataContext.Inventory" @ref="grid"
+      Data="_Inventory"
+      Class="table table-hover table-bordered table-striped text-nowrap"
+      AllowSorting="true"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="8"
+      Responsive="true"
+      Unit="Unit.Px">
+
+    <GridColumn TItem="DataContext.Inventory" HeaderText="Serial" SortKeySelector="item => item.Serial" PropertyName="Serial" FilterOperator="FilterOperator.Contains">
+        @context.Serial
+    </GridColumn>
+
+    <GridColumn TItem="DataContext.Inventory" HeaderText="Equipo" SortKeySelector="item => item.FullModelName" PropertyName="FullModelName" FilterOperator="FilterOperator.Contains">
+        @context.FullModelName
+    </GridColumn>
+
+    <GridColumn TItem="DataContext.Inventory" HeaderText="Asignado a" SortKeySelector="item => item.AssignedUser" PropertyName="AssignedUser" FilterOperator="FilterOperator.Contains">
+        @context.AssignedUser
+    </GridColumn>
+
+    <GridColumn TItem="DataContext.Inventory" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="row">
+            <div class="col-12 d-flex">
+                <Button @onclick="async () => await OnShowModalViewClick(context)">
+                    <span class="oi oi-magnifying-glass" aria-hidden="true" title="Ver Info"></span>
+                </Button>
+                <Button @onclick="async () => await OnShowModalEditClick(context)">
+                    <span class="oi oi-pencil" aria-hidden="true" title="Editar"></span>
+                </Button>
+                <Button @onclick="async () => await OnShowModalAddUsersClick(context, context.Id, context.Username, context.InventoryUsers.ToList())">
+                    <span class="oi oi-person" aria-hidden="true" title="Asignar Usuarios"></span>
+                </Button>
+                <Button @onclick="async () => await SaveDefinitiveDelete(context.Id)">
+                    <span class="oi oi-trash" aria-hidden="true" title="Eliminar"></span>
+                </Button>
+                <Button @onclick="async () => await OnShowModalHistoryClick(context)">
+                    <span class="oi oi-header" aria-hidden="true" title="Ver Info"></span>
+                </Button>
+            </div>
+        </div>
+    </GridColumn>
+</Grid>
+
+<ConfirmDialog @ref="dialog" />
+
+<Modal @ref="modalView" Title="Ver Detalles" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h4><b>@viewInventory.FullModelName<h6 style="font-size: 15px;">Número De Serie: @viewInventory.Serial </h6> </b></h4>
+                <div style="display: none">
+                    @viewInventory.Id
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                • Estado: @viewInventory.StateName
+                <br />
+                • Usuario Asignado: @viewInventory.AssignedUser
+                <br />
+                • Procesador: @viewInventory.Processor
+                <br />
+                • Memoria(RAM): @viewInventory.Memory
+                <br />
+                • Almacenamiento(HDD/SSD): @viewInventory.Storage
+                <br />
+            </div>
+        </div>
+
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-6">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalViewClick">Cerrar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+<Modal @ref="modalEdit" Title="Editar Laptop" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h4>@editInventory.FullModelName</h4>
+                <div style="display: none">
+                    @editInventory.Id
+                </div>
+            </div>
+        </div>
+
+        <div class="row pt-2">
+            <div class="col-4 d-flex align-items-center">
+                Serial
+            </div>
+            <div class="col-8">
+                <InputText Class="form-control" @bind-Value="@editInventory.Serial"></InputText>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-4 d-flex align-items-center">
+                Procesador
+            </div>
+            <div class="col-8">
+                <InputText Class="form-control" @bind-Value="@editInventory.Processor"></InputText>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-4 d-flex align-items-center">
+                Memoria(RAM)
+            </div>
+            <div class="col-8">
+                <InputText Class="form-control" @bind-Value="@editInventory.Memory"></InputText>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-4 d-flex align-items-center">
+                Almacenamiento(HDD/SSD)
+            </div>
+            <div class="col-8">
+                <InputText Class="form-control" @bind-Value="@editInventory.Storage"></InputText>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-4 d-flex align-items-center">
+                Estado de Maquina
+            </div>
+            <div class="col-8">
+                <InputSelect Class="form-control" @bind-Value="@editInventory.State">
+
+                    @foreach (var status in Enum.GetValues(typeof(InventoryStatus)).Cast<InventoryStatus>())
+                    {
+                        var statusValue = (int)status;
+                        var shouldShow = true;
+
+                        if (status == InventoryStatus.Asignada)
+                        {
+
+                            shouldShow = HasAssignedUser;
+                        }
+                        else if (status == InventoryStatus.Disponible || status == InventoryStatus.Inactiva)
+                        {
+
+                            shouldShow = !HasAssignedUser;
+                        }
+
+                        if (shouldShow)
+                        {
+                            <option value="@statusValue">@status</option>
+                        }
+                    }
+                </InputSelect>
+            </div>
+        </div>
+
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="SaveEdit">Guardar</Button>
+        </div>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalEditClick">Cerrar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+<Modal @ref="modalAddUsers" Title="Asignar Usuarios" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h4><b>@modalName</b></h4>
+                <div style="display: none">
+                    @modalId
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <h4><b>@assignInventory.FullModelName<h6 style="font-size: 15px;">Número De Serie: @assignInventory.Serial </h6> </b></h4>
+                <div style="display: none">
+                    @assignInventory.Id
+                </div>
+            </div>
+        </div>
+
+        <div class="row pt-2">
+            <div class="col-6">
+                <InputSelect class="form-select" @bind-Value="addUserId" disabled="@(_InventoryUsers.Count > 0)">
+                    <option selected value=-1 disabled>Seleccione</option>
+                    @foreach (var u in _users.Where(u => u.IsActive && !_InventoryUsers.Any(m => m.UserId == u.Id)).OrderBy(x => x.UserFullName))
+                    {
+                        <option value=@u.Id>@u.UserFullName (@u.Username)</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-3">
+                <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalAddUserClick">Cerrar</Button>
+            </div>
+            <div class="col-3">
+                <Button Class="btn btn-primary form-control" @onclick="SaveAssignedUser" disabled="@(_InventoryUsers.Count > 0)">
+                    Guardar
+                </Button>
+            </div>
+        </div>
+        <div class="row pt-4">
+            <div class="col-12" style="margin-top: 20px">
+                <h5>Usuarios Asignados</h5>
+            </div>
+        </div>
+
+        <div class="row pt-2">
+            <div class="col-12">
+                @if (_InventoryUsers.Count == 0)
+                {
+                    <div class="row">
+                        <div class="col-12 d-flex align-items-center">
+                            No hay usuarios asignados
+                        </div>
+                    </div>
+                }
+                else if (_InventoryUsers.Count > 0)
+                    foreach (var u in _InventoryUsers)
+                    {
+                        <div class="row pt-1">
+                            <div class="col-10 d-flex align-items-center">
+                                @u.User.UserFullName (@u.User.Username)
+                            </div>
+
+                            <div class="col-2 d-flex align-items-center justify-content-end">
+                                <Button Class="btn form-control" Color="ButtonColor.Primary" @onclick="@(() => DeleteUser(u.Id, u.UserId))">
+                                    <div class="row">
+                                        <div class="col-12 d-flex align-items-center justify-content-center">
+                                            <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-white)"></span>
+                                        </div>
+                                    </div>
+                                </Button>
+                            </div>
+                        </div>
+                    }
+            </div>
+        </div>
+
+    </BodyTemplate>
+</Modal>
+
+<Modal @ref="modalHistory" Title="Historial" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div>
+            <div class="row">
+                <div class="col-12">
+                    <h4 style="text-align: center;"><b>@editInventory.FullModelName</b></h4>
+                </div>
+            </div>
+
+            <div class="row pt-3">
+                <div class="col-12" style="overflow: auto; margin-bottom: 10px">
+                    @foreach (var events in editInventory.InventoryHistories)
+                    {
+                        <div class="row history-container">
+                            <div class="col-12">
+                                <div class="row" style="margin-top: 10px">
+                                    <div class="col-4 d-flex align-items-center">
+                                        <b>@editInventory.FullModelName</b>
+                                    </div>
+                                    <div class="col-8 d-flex align-items-center justify-content-end">
+                                        @events.Date
+                                    </div>
+                                </div>
+                                <hr>
+                                <div class="row" style="margin-top: 10px; margin-bottom: 10px">
+                                    <div class="col-10">
+                                        @events.Observation
+                                    </div>
+                                    <div class="col-2 d-flex align-items-center justify-content-end">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalHistory">Cerrar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+@code
+{
+    [Inject] ToastService ToastService { get; set; }
+    private ConfirmDialog dialog;
+    private Collapse collapseAgregar;
+    private Grid<DataContext.Inventory> grid;
+
+    private Modal modalView;
+    private Modal modalAddUsers;
+    private Modal modalEdit;
+    private Modal modalHistory;
+
+    private bool HasAssignedUser => editInventory.InventoryUsers.Any();
+
+    private long addUserId { get; set; } = -1;
+    public long modalTaskId { get; set; }
+    private string modalName { get; set; }
+    private long modalId { get; set; }
+
+
+    private DataContext.Inventory addInventory { get; set; } = new DataContext.Inventory();
+    private DataContext.Inventory editInventory { get; set; } = default!;
+    private DataContext.Inventory viewInventory { get; set; } = default!;
+    private DataContext.Inventory assignInventory { get; set; } = default!;
+    private DataContext.InventoryBrand addBrand { get; set; } = new DataContext.InventoryBrand();
+    private DataContext.InventoryUser inventoryUser { get; set; } = new InventoryUser();
+
+    private List<DataContext.Inventory> _Inventory = new List<DataContext.Inventory>();
+    private List<DataContext.InventoryBrand> _Brands = new List<DataContext.InventoryBrand>();
+    private List<DataContext.InventoryModel> _InventoryModels = new List<DataContext.InventoryModel>();
+    private List<DataContext.InventoryUser> _InventoryUsers = new List<DataContext.InventoryUser>();
+    private List<DataContext.InventoryHistory> _InventoryHistories = new List<DataContext.InventoryHistory>();
+
+    private DataContext.InventoryUser _inventoryUser = new DataContext.InventoryUser();
+
+    private List<DataContext.User> _users = new List<DataContext.User>();
+
+    private List<InventoryModel> _filteredModels = new List<InventoryModel>();
+
+
+    private IEnumerable<InventoryStatus> GetInventoryStatusOptions()
+    {
+        return Enum.GetValues(typeof(InventoryStatus)).Cast<InventoryStatus>().Where(status => status != InventoryStatus.Asignada);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        changedState.ChangeAction += StateHasChanged;
+        await GetGrid();
+        await GetCombos();
+        await base.OnInitializedAsync();
+    }
+
+    public void Dispose()
+    {
+        changedState.ChangeAction -= StateHasChanged;
+    }
+
+    private async Task GetCombos()
+    {
+        try
+        {
+            _Brands = await _InventoryService.GetBrands();
+            _InventoryModels = await _InventoryService.GetInventoryModels();
+            _users = await _InventoryService.GetUsersWithoutNotebook();            
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task GetGrid()
+    {
+        try
+        {         
+            var result = await _InventoryService.GetAsync(); 
+            _Inventory = result?.Where(item => item != null).ToList() ?? new List<DataContext.Inventory>();
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private void FilterModels(ChangeEventArgs e)
+    {
+        string selectedBrandIdString = (string)e.Value;
+        if (long.TryParse(selectedBrandIdString, out long selectedBrandId))
+        {
+            _filteredModels = _InventoryModels.Where(m => m.BrandId == selectedBrandId).ToList();
+            StateHasChanged();
+        }
+    }
+
+    private async Task SaveAdd()
+    {
+        try
+        {
+            if (addInventory.State == default)
+            {
+                addInventory.State = (short)InventoryStatus.Disponible;
+            }
+
+            await _InventoryService.AddAsync(addInventory);
+
+            addInventory = new DataContext.Inventory();
+
+            await GetGrid();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con exito",
+                    Title = "Agregar Laptop"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveAddMultiple()
+    {
+        try
+        {
+
+            await _InventoryService.AddAsyncMultiple(addInventory);
+
+            addInventory.Id = 0;
+            addInventory.Serial = "";
+            StateHasChanged();
+            await GetGrid();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con exito",
+                    Title = "Agregar Laptop"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveEdit()
+    {
+        try
+        {
+            await _InventoryService.EditAsync(editInventory);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+            await OnHideModalEditClick();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Acción realizada con exito",
+                    Title = "Editar Laptop"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+
+    private async Task SaveAssignedUser()
+    {
+        if (addUserId != -1)
+        {
+            try
+            {
+                await _InventoryService.AddUsersAsync(assignInventory.Id, addUserId);
+                await GetGrid();
+
+                _InventoryUsers = _Inventory.First(x => x.Id == assignInventory.Id).InventoryUsers.OrderBy(x => x.User.UserFullName).ToList();
+
+                changedState.InitChanges();
+                await grid.RefreshDataAsync();
+
+                ToastService.Notify(new ToastMessage()
+                    {
+                        Type = ToastType.Success,
+                        Message = $"Acción realizada con éxito.",
+                        Title = "Editar Equipos - Asignar Usuario"
+                    });
+            }
+            catch (Exception ex)
+            {
+                ToastService.Notify(new ToastMessage()
+                    {
+                        Type = ToastType.Danger,
+                        Message = "Error inesperado al realizar la acción",
+                        Title = "Error"
+                    });
+            }
+        }
+    }
+
+    private void CancelAdd()
+    {
+        /*  addInventory = new DataContext.Inventory(); */  // Esta opcion no funciona
+        /* addInventory.Model.BrandId = -1; */              // Esta opcion no funciona
+
+        addInventory.Crystal = "";
+        addInventory.Processor = "";
+        addInventory.Storage = "";
+        addInventory.Memory = "";
+        addInventory.Serial = "";
+        addInventory.ModelId = -1;
+
+       
+    }
+
+    private async Task OnHideModalViewClick()
+    {
+        await modalView?.HideAsync();
+    }
+
+    private async Task OnHideModalEditClick()
+    {
+        await modalEdit?.HideAsync();
+    }
+
+    private async Task OnHideModalAddUserClick()
+    {
+        await modalAddUsers?.HideAsync();
+    }
+
+    private async Task OnHideModalHistory()
+    {
+
+        await modalHistory?.HideAsync();
+    }
+
+    private async Task ToggleContentAsync() => await collapseAgregar.ToggleAsync();
+
+    private async Task OnShowModalViewClick(DataContext.Inventory Inventory)
+    {
+        viewInventory = Inventory;
+        await modalView?.ShowAsync();
+    }
+
+    private async Task OnShowModalHistoryClick(DataContext.Inventory inventory)
+    {
+        editInventory = inventory;
+        await modalHistory?.ShowAsync();
+    }
+
+    private async Task OnShowModalEditClick(DataContext.Inventory Inventory)
+    {
+        editInventory = Inventory;
+        await modalEdit?.ShowAsync();
+    }
+
+    private async Task OnShowModalAddUsersClick(DataContext.Inventory Inventory, long id, string name, List<InventoryUser> users)
+    {
+        modalId = id;
+        modalName = name;
+        _InventoryUsers = users;
+
+        editInventory = Inventory;
+        assignInventory = Inventory;
+        await modalAddUsers?.ShowAsync();
+    }
+
+    private async Task DeleteUser(long id, long userId)
+    {
+        try
+        {
+            await _InventoryService.DeleteUsersAsync(id, userId);
+            await GetGrid();
+            await grid.RefreshDataAsync();
+
+            // _InventoryUsers = new List<InventoryUser>();
+            _InventoryUsers = _Inventory.First(x => x.Id == assignInventory.Id).InventoryUsers.ToList();
+            _InventoryUsers = new List<InventoryUser>();
+            changedState.InitChanges();
+            StateHasChanged();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Editar Laptop -´Quitar Usuario"
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Danger,
+                    Message = "Error inesperado al realizar la acción",
+                    Title = "Error"
+                });
+        }
+    }
+    private async Task SaveDefinitiveDelete(long Id)
+    {
+        try
+        {
+            await _InventoryService.DefinitiveDeleteAsync(Id);
+
+            await GetGrid();
+            await grid.RefreshDataAsync();
+
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = $"Acción realizada con éxito.",
+                    Title = "Eliminar Laptop "
+                });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Warning,
+                    Message = "Debe desasignar un usuario antes de eliminar. ",
+                    Title = "Error"
+                });
+        }
+    }
+
+
+    protected override void OnInitialized()
+    {
+        addInventory = new DataContext.Inventory();
+        addInventory.ModelId = -1;
+        addBrand.Id = -1;
+        addInventory.State = -1;
+        base.OnInitialized();
+    }
+}

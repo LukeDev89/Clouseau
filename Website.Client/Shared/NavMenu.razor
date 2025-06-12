@@ -1,0 +1,299 @@
+﻿@using BlazorBootstrap
+@using DataModel.Enums;
+@using DataService.Auth;
+@using DataService.State;
+@using DataContext;
+@using DataService.Interfaces.Management;
+
+@implements IDisposable
+
+@inject AuthService authService
+@inject LoginState loginState
+
+<div class="top-row ps-3 navbar navbar-dark">
+	<div class="container-fluid">
+		<div class="row">
+			<div class="col-12">
+				<a class="navbar-brand" href=""><img width="40" height="40" src="favicon.png" alt="clouseau" />&nbsp;&nbsp; Clouseau</a>
+				<button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+					<span class="navbar-toggler-icon"></span>
+				</button>
+			</div>
+		</div>
+
+	</div>
+</div>
+
+<div class="@NavMenuCssClass nav-scrollable" style="min-width: 150px !important" @onclick="ToggleNavMenu">
+	<nav class="flex-column">
+		<div class="nav-item px-3">
+			<NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+				<span class="oi oi-home" aria-hidden="true"></span> Inicio
+			</NavLink>
+		</div>
+		@if (authService.IsLoggedIn)
+		{
+			<div class="nav-item px-3">
+				<NavLink @onclick="ToggleStandarContentAsync" Class="nav-link" style="cursor: pointer">
+					<span class="@standarClass" aria-hidden="true"></span>Gestión Personal
+				</NavLink>
+
+                <Collapse @ref="collapseStandar" Style="margin-top: -10px">
+                    @if (authService.User.Permissions.Exists(x => x == (long)SectionsEnum.CargaDeHoras))
+                    {
+                        <div class="nav-item px-3">
+                            <NavLink class="nav-link" href="/users/timerecord">
+                                <span class="oi oi-clock" aria-hidden="true"></span> Carga de Horas
+                            </NavLink>
+                        </div>
+                    }
+                    @if (authService.User.Permissions.Exists(x => x == (long)SectionsEnum.ImportarHoras))
+                    {
+                        <div class="nav-item px-3">
+                            <NavLink class="nav-link" href="/users/timerecordimport">
+                                <span class="oi oi-data-transfer-upload" aria-hidden="true"></span> Importar Horas
+                            </NavLink>
+                        </div>
+                    }
+
+                    @if (authService.User.Permissions.Exists(x => x == (long)SectionsEnum.SolicitudDeLicencias))
+                    {
+                        <div class="nav-item px-3">
+                            <NavLink class="nav-link" href="/admin/usernonworkingdayrequest">
+                                <span class="oi oi-clipboard" aria-hidden="true"></span> Solicitud Licencias
+                            </NavLink>
+                        </div>
+                    }
+
+                    @if (authService.User.Permissions.Exists(x => x == (long)SectionsEnum.Licencias))
+                    {
+                        <div class="nav-item px-3">
+                            <NavLink class="nav-link" href="/users/nonworkingdays">
+                                <span class="oi oi-clipboard" aria-hidden="true"></span> Licencias
+                            </NavLink>
+                        </div>
+                    }
+
+                    @if (authService.User.Permissions.Exists(x => x == (long)SectionsEnum.Feedback))
+                    {
+                        <div class="nav-item px-3">
+                            <NavLink class="nav-link" href="/admin/feedbacks">
+                                <span class="oi oi-pie-chart" aria-hidden="true"></span> Feedbacks
+                            </NavLink>
+                        </div>
+                    }
+
+                    @if (authService.User.Permissions.Exists(x => x == (long)SectionsEnum.Tickets))
+                    {
+                        <div class="nav-item px-3">
+                            <NavLink class="nav-link" href="/admin/resourcewarning">
+                                <span class="oi oi-envelope-closed" aria-hidden="true"></span> Incidencias a RRHH
+                            </NavLink>
+                        </div>
+                    }
+
+                </Collapse>
+            </div>
+
+            @if (authService.User.Permissions.Any(x =>
+           x == (long)SectionsEnum.Administrar ||
+           x == (long)SectionsEnum.RagStatus))
+            {
+                <div class="nav-item px-3">
+                    <NavLink @onclick="ToggleGestorContentAsync" Class="nav-link" style="cursor: pointer">
+                        <span class="@gestorClass" aria-hidden="true"></span>Gestión de Proyectos
+                    </NavLink>
+
+                    <Collapse @ref="collapseGestor" Style="margin-top: -10px">
+                        @if (authService.User.Permissions.Contains((long)SectionsEnum.Administrar))
+                        {
+                            <div class="nav-item px-3">
+                                <NavLink class="nav-link" href="/admin/projects">
+                                    <span class="oi oi-briefcase" aria-hidden="true"></span> Administrar
+                                </NavLink>
+                            </div>
+                        }
+
+                        @if (authService.User.Permissions.Contains((long)SectionsEnum.RagStatus))
+                        {
+                            <div class="nav-item px-3">
+                                <NavLink class="nav-link" href="/admin/RAG">
+                                    <span class="oi oi-clipboard" aria-hidden="true"></span> RAG
+                                </NavLink>
+                            </div>
+                        }
+                    </Collapse>
+                </div>
+            }
+
+            @if (authService.User.Permissions.Any(x =>
+             x == (long)SectionsEnum.RagTemplates ||
+             x == (long)SectionsEnum.Inventario ||
+             x == (long)SectionsEnum.Clientes ||
+             x == (long)SectionsEnum.Usuarios))
+            {
+                <div class="nav-item px-3">
+                    <NavLink @onclick="ToggleAdminContentAsync" Class="nav-link" style="cursor: pointer">
+                        <span class="@adminClass" aria-hidden="true"></span>Administración
+                    </NavLink>
+
+                    <Collapse @ref="collapseAdmin" Style="margin-top: -10px">
+
+                        @if (authService.User.Permissions.Exists(x => x == (long)SectionsEnum.Usuarios))
+                        {
+                            <div class="nav-item px-3">
+                                <NavLink class="nav-link" href="/admin/users">
+                                    <span class="oi oi-person" aria-hidden="true"></span> Usuarios
+                                </NavLink>
+                            </div>
+                        }
+
+                        @if (authService.User.Permissions.Exists(x => x == (long)SectionsEnum.Clientes))
+                        {
+                            <div class="nav-item px-3">
+                                <NavLink class="nav-link" href="/admin/clients">
+                                    <span class="oi oi-globe" aria-hidden="true"></span> Clientes
+                                </NavLink>
+                            </div>
+                        }
+
+                        @if (authService.User.Permissions.Exists(x => x == (long)SectionsEnum.Inventario))
+                        {
+                            <div class="nav-item px-3">
+                                <NavLink class="nav-link" href="/admin/inventory">
+                                    <span class="oi oi-monitor" aria-hidden="true"></span> Inventario
+                                </NavLink>
+                            </div>
+                        }
+                     
+                    </Collapse>
+                </div>
+            }
+
+            @if (authService.User.Permissions.Any(x =>
+             x == (long)SectionsEnum.TablasMaestras ||
+             x == (long)SectionsEnum.Comunicacion ||
+             x == (long)SectionsEnum.Configuracion))
+            {
+                <div class="nav-item px-3">
+                    <NavLink @onclick="ToggleSystemContentAsync" Class="nav-link" style="cursor: pointer">
+                        <span class="@systemClass" aria-hidden="true"></span>Sistema
+                    </NavLink>
+
+                    <Collapse @ref="collapseSystem" Style="margin-top: -10px">
+                        @if (authService.User.Permissions.Contains((long)SectionsEnum.TablasMaestras))
+                        {
+                            <div class="nav-item px-3">
+                                <NavLink class="nav-link" href="/system/management">
+                                    <span class="oi oi-monitor" aria-hidden="true"></span> Tablas Maestras
+                                </NavLink>
+                            </div>
+                        }
+
+                        @if (authService.User.Permissions.Contains((long)SectionsEnum.Comunicacion))
+                        {
+                            <div class="nav-item px-3">
+                                <NavLink class="nav-link" href="/system/communication">
+                                    <span class="oi oi-microphone" aria-hidden="true"></span> Comunicación
+                                </NavLink>
+                            </div>
+                        }
+
+                        @if (authService.User.Permissions.Contains((long)SectionsEnum.Configuracion))
+                        {
+                            <div class="nav-item px-3">
+                                <NavLink class="nav-link" href="/system/systemConfiguration">
+                                    <span class="oi oi-cog" aria-hidden="true"></span> Configuración
+                                </NavLink>
+                            </div>
+                        }
+                    </Collapse>
+                </div>
+            }
+
+            @if (authService.User.Permissions.Any(x =>x == (long)SectionsEnum.Consultas))
+            {
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="/project/queries" Match="NavLinkMatch.All">
+                        <span class="oi oi-terminal" aria-hidden="true"></span> Consultas
+                    </NavLink>
+                </div>
+            }
+        }
+    </nav>
+</div>
+
+
+@code {
+	private static string closededClass = "oi oi-caret-right";
+	private static string openedClass = "oi oi-caret-bottom menuNavActive";
+
+    private List<Section> Sections = new List<Section>();
+
+    private Collapse collapseStandar = default!;
+    private string standarClass = closededClass;
+    private Collapse collapseGestor = default!;
+    private string gestorClass = closededClass;
+    private Collapse collapseAdmin = default!;
+    private string adminClass = closededClass;
+    private Collapse collapseSystem = default!;
+    private string systemClass = closededClass;
+
+	private bool collapseNavMenu = true;
+
+	private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+	private bool startCollapse = false;
+
+	private void ToggleNavMenu()
+	{
+		collapseNavMenu = !collapseNavMenu;
+	}
+
+	protected override void OnInitialized()
+	{
+		loginState.LoginAction += StateHasChanged;
+	}
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (!startCollapse && collapseStandar != null)
+		{
+			await ToggleStandarContentAsync();
+			startCollapse = true;
+			standarClass = openedClass;
+
+			StateHasChanged();
+		}
+	}
+
+	public void Dispose()
+	{
+		loginState.LoginAction -= StateHasChanged;
+	}
+
+	private async Task ToggleStandarContentAsync()
+	{
+		await collapseStandar.ToggleAsync();
+		standarClass = collapseStandar.Toggle ? openedClass : closededClass;
+	}
+
+	private async Task ToggleGestorContentAsync()
+	{
+		await collapseGestor.ToggleAsync();
+		gestorClass = collapseGestor.Toggle ? openedClass : closededClass;
+
+	}
+
+	private async Task ToggleAdminContentAsync()
+	{
+		await collapseAdmin.ToggleAsync();
+		adminClass = collapseAdmin.Toggle ? openedClass : closededClass;
+
+	}
+
+    private async Task ToggleSystemContentAsync()
+    {
+        await collapseSystem.ToggleAsync();
+        systemClass = collapseSystem.Toggle ? openedClass : closededClass;
+    }
+}
