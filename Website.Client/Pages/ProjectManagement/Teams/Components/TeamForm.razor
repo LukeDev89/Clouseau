@@ -1,0 +1,50 @@
+@using BlazorBootstrap
+@using DataContext
+
+<Card>
+    <CardBody>
+        <div class="row">
+            <div class="col-6">
+                Nombre
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-9">
+                <InputText Class="form-control" @bind-Value="@Team.Name"></InputText>
+            </div>
+
+            <div class="col-3">
+                <div class="row">
+                    <div class="col-6">
+                        <Button Class="btn btn-secondary form-control" @onclick="OnCancel">
+                            Limpiar
+                        </Button>
+                    </div>
+                    <div class="col-6">
+                        <Button Class="btn btn-primary form-control" @onclick="OnSave">
+                            @(IsEdit ? "Guardar" : "Crear")
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </CardBody>
+</Card>
+
+@code {
+    [Parameter] public Team Team { get; set; } = new Team();
+    [Parameter] public bool IsEdit { get; set; } = false;
+    
+    [Parameter] public EventCallback<Team> OnSaveTeam { get; set; }
+    [Parameter] public EventCallback OnCancelTeam { get; set; }
+
+    private async Task OnSave()
+    {
+        await OnSaveTeam.InvokeAsync(Team);
+    }
+
+    private async Task OnCancel()
+    {
+        await OnCancelTeam.InvokeAsync();
+    }
+}

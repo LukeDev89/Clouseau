@@ -1,0 +1,74 @@
+@using BlazorBootstrap
+@using DataContext
+
+<Grid TItem="Project" @ref="grid"
+    Data="Projects"
+    Class="table table-hover table-bordered table-striped"
+    AllowSorting="true"
+    AllowFiltering="true"
+    AllowPaging="true"
+    PageSize="8"
+    Responsive="true">
+
+    <GridColumn TItem="Project" HeaderText="Cliente" SortKeySelector="item => item.ClientName" PropertyName="ClientName" FilterOperator="FilterOperator.Contains">
+        @context.ClientName
+    </GridColumn>
+
+    <GridColumn TItem="Project" HeaderText="CECO" SortKeySelector="item => item.Name" PropertyName="Name" FilterOperator="FilterOperator.Contains">
+        @context.Name
+    </GridColumn>
+
+    <GridColumn TItem="Project" HeaderText="Equipo" SortKeySelector="item => item.TeamName" PropertyName="TeamName" FilterOperator="FilterOperator.Contains">
+        @context.TeamName
+    </GridColumn>
+
+    <GridColumn TItem="Project" HeaderText="Responsable" SortKeySelector="item => item.ClientResponsibleName" PropertyName="ClientResponsibleName" FilterOperator="FilterOperator.Contains">
+        @context.ClientResponsibleName
+    </GridColumn>
+
+    <GridColumn TItem="Project" HeaderText="Creado" SortKeySelector="item => item._Created" PropertyName="_Created" FilterOperator="FilterOperator.Equals">
+        @context.Created.ToString("dd/MM/yyyy")
+    </GridColumn>
+
+    <GridColumn TItem="Project" HeaderText="Baja" SortKeySelector="item => item._Deleted" PropertyName="_Deleted" FilterOperator="FilterOperator.Equals">
+        @context.Deleted?.ToString("dd/MM/yyyy")
+    </GridColumn>
+
+    <GridColumn TItem="Project" HeaderText="Activo" PropertyName="Active">
+        @if (context.Active)
+        {
+            <span class="oi oi-circle-check" aria-hidden="true" style="color: var(--l-green)"></span>
+        }
+        else
+        {
+            <span class="oi oi-circle-x" aria-hidden="true" style="color: var(--l-red)"></span>
+        }
+    </GridColumn>
+
+    <GridColumn TItem="Project" HeaderText="Acciones" Sortable="false" Filterable="false">
+        <div class="row">
+            <div class="col-12 d-flex">
+                <Button @onclick="() => OnEditProject.InvokeAsync(context)">
+                    <span class="oi oi-pencil" aria-hidden="true" title="Editar"></span>
+                </Button>
+                <Button @onclick="() => OnDeleteProject.InvokeAsync(context)">
+                    <span class="oi oi-circle-x" aria-hidden="true" title="Eliminar" style="color: var(--l-red)"></span>
+                </Button>
+            </div>
+        </div>
+    </GridColumn>
+</Grid>
+
+@code {
+    [Parameter] public List<Project> Projects { get; set; } = new();
+    
+    [Parameter] public EventCallback<Project> OnEditProject { get; set; }
+    [Parameter] public EventCallback<Project> OnDeleteProject { get; set; }
+
+    private Grid<Project> grid;
+
+    public async Task RefreshAsync()
+    {
+        await grid.RefreshDataAsync();
+    }
+}
