@@ -15,4 +15,5 @@ public partial class TaskType
 
     public virtual ICollection<TaskProgress> TaskProgresses { get; set; } = new List<TaskProgress>();
     public virtual ICollection<ProjectTask> ProjectTasks { get; set; } = new List<ProjectTask>();
+    public virtual ICollection<ExtraHours> ExtraHours { get; set; } = new List<ExtraHours>();
 }

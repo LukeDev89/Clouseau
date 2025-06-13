@@ -1,0 +1,366 @@
+﻿@using BlazorBootstrap
+@using DataContext
+@using DataModel.Dto
+@using DataModel.Enums
+@using DataService.Auth
+@using DataService.Interfaces.SystemManagement
+@using System.Globalization
+
+@using Microsoft.AspNetCore.Components
+
+@page "/extra-hours-approval"
+
+@inject IExtraHoursService _extraHoursService
+@inject AuthService _authService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject IJSRuntime JS
+@inject NavigationManager navigationManager
+
+<h3>Aprobación de Horas Extra</h3>
+
+<div class="row">
+    <div class="col-12">
+        <Alert Color="AlertColor.Info">
+            <Icon Name="IconName.InfoCircleFill" class="me-2"></Icon>
+            Como supervisor, puede aprobar o rechazar las solicitudes de horas extra de su equipo.
+        </Alert>
+    </div>
+</div>
+
+<br />
+
+@if (_pendingExtraHours.Count == 0)
+{
+    <div class="row">
+        <div class="col-12">
+            <Alert Color="AlertColor.Success">
+                <Icon Name="IconName.CheckCircleFill" class="me-2"></Icon>
+                No hay solicitudes de horas extra pendientes de aprobación.
+            </Alert>
+        </div>
+    </div>
+}
+else
+{
+    <div class="row">
+        <div class="col-12">
+            <Grid TItem="ExtraHours" @ref="grid"
+                  Data="_pendingExtraHours"
+                  Class="table table-hover table-bordered table-striped text-nowrap"
+                  AllowSorting="true"
+                  AllowFiltering="true"
+                  Responsive="true"
+                  Unit="Unit.Px">
+
+                <GridColumn TItem="ExtraHours" HeaderText="Empleado" SortKeySelector="item => item.User.UserFullName" PropertyName="User.UserFullName" FilterOperator="FilterOperator.Contains">
+                    @context.User.UserFullName
+                </GridColumn>
+
+                <GridColumn TItem="ExtraHours" HeaderText="Fecha" SortKeySelector="item => item.Date" PropertyName="Date" FilterOperator="FilterOperator.Contains">
+                    @context.Date.ToString("dd/MM/yyyy")
+                </GridColumn>
+
+                <GridColumn TItem="ExtraHours" HeaderText="Tarea" SortKeySelector="item => item.Task.Name" PropertyName="Task.Name" FilterOperator="FilterOperator.Contains">
+                    <div title="@context.Task.Name" style="max-width: 30ch; overflow: hidden; text-overflow: ellipsis;">
+                        @context.Task.Name
+                    </div>
+                </GridColumn>
+
+                <GridColumn TItem="ExtraHours" HeaderText="Tipo" SortKeySelector="item => item.TaskType.Name" PropertyName="TaskType.Name" FilterOperator="FilterOperator.Contains">
+                    @context.TaskType.Name
+                </GridColumn>
+
+                <GridColumn TItem="ExtraHours" HeaderText="Horas" TextAlignment="Alignment.End" SortKeySelector="item => item.Hours" PropertyName="Hours" Filterable="false">
+                    @context.Hours
+                </GridColumn>
+
+                <GridColumn TItem="ExtraHours" HeaderText="Solicitado" SortKeySelector="item => item.Created" PropertyName="Created" FilterOperator="FilterOperator.Contains">
+                    @context.Created.ToString("dd/MM/yyyy HH:mm")
+                </GridColumn>
+
+                <GridColumn TItem="ExtraHours" HeaderText="Comentario" SortKeySelector="item => item.Comment" PropertyName="Comment" FilterOperator="FilterOperator.Contains">
+                    <div title="@context.Comment" style="max-width: 40ch; overflow: hidden; text-overflow: ellipsis;">
+                        @context.Comment
+                    </div>
+                </GridColumn>
+
+                <GridColumn TItem="ExtraHours" HeaderText="Acciones" Sortable="false" Filterable="false">
+                    <div class="row">
+                        <div class="col-12 d-flex">
+                            <Button @onclick="async () => await OnApproveClick(context)" Color="ButtonColor.Success" Size="ButtonSize.Small" class="me-2">
+                                <Icon Name="IconName.CheckCircle" class="me-1"></Icon>
+                                Aprobar
+                            </Button>
+                            <Button @onclick="async () => await OnRejectClick(context)" Color="ButtonColor.Danger" Size="ButtonSize.Small">
+                                <Icon Name="IconName.XCircle" class="me-1"></Icon>
+                                Rechazar
+                            </Button>
+                        </div>
+                    </div>
+                </GridColumn>
+            </Grid>
+        </div>
+    </div>
+}
+
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <h4>Historial de Decisiones</h4>
+        
+        <Grid TItem="ExtraHours" @ref="historyGrid"
+              Data="_reviewedExtraHours"
+              Class="table table-hover table-bordered table-striped text-nowrap"
+              AllowSorting="true"
+              AllowFiltering="true"
+              Responsive="true"
+              Unit="Unit.Px">
+
+            <GridColumn TItem="ExtraHours" HeaderText="Empleado" SortKeySelector="item => item.User.UserFullName" PropertyName="User.UserFullName" FilterOperator="FilterOperator.Contains">
+                @context.User.UserFullName
+            </GridColumn>
+
+            <GridColumn TItem="ExtraHours" HeaderText="Fecha" SortKeySelector="item => item.Date" PropertyName="Date" FilterOperator="FilterOperator.Contains">
+                @context.Date.ToString("dd/MM/yyyy")
+            </GridColumn>
+
+            <GridColumn TItem="ExtraHours" HeaderText="Horas" TextAlignment="Alignment.End" SortKeySelector="item => item.Hours" PropertyName="Hours" Filterable="false">
+                @context.Hours
+            </GridColumn>
+
+            <GridColumn TItem="ExtraHours" HeaderText="Estado" SortKeySelector="item => item.Status" PropertyName="Status" FilterOperator="FilterOperator.Contains">
+                @if (context.Status == 2)
+                {
+                    <Badge Color="BadgeColor.Success">Aprobadas</Badge>
+                }
+                else if (context.Status == 3)
+                {
+                    <Badge Color="BadgeColor.Danger">Rechazadas</Badge>
+                }
+                else
+                {
+                    <Badge Color="BadgeColor.Secondary">Desconocido</Badge>
+                }
+            </GridColumn>
+
+            <GridColumn TItem="ExtraHours" HeaderText="Revisado" SortKeySelector="item => item.Reviewed" PropertyName="Reviewed" FilterOperator="FilterOperator.Contains">
+                @context.Reviewed?.ToString("dd/MM/yyyy HH:mm")
+            </GridColumn>
+
+            <GridColumn TItem="ExtraHours" HeaderText="Comentario Revisión" SortKeySelector="item => item.ReviewComment" PropertyName="ReviewComment" FilterOperator="FilterOperator.Contains">
+                <div title="@context.ReviewComment" style="max-width: 40ch; overflow: hidden; text-overflow: ellipsis;">
+                    @context.ReviewComment
+                </div>
+            </GridColumn>
+        </Grid>
+    </div>
+</div>
+
+<Modal @ref="reviewModal" Title="@modalTitle" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row">
+            <div class="col-12">
+                <h5>Detalles de la Solicitud</h5>
+                <p><strong>Empleado:</strong> @selectedExtraHours?.User?.UserFullName</p>
+                <p><strong>Fecha:</strong> @selectedExtraHours?.Date.ToString("dd/MM/yyyy")</p>
+                <p><strong>Tarea:</strong> @selectedExtraHours?.Task?.Name</p>
+                <p><strong>Horas:</strong> @selectedExtraHours?.Hours</p>
+                <p><strong>Comentario:</strong> @selectedExtraHours?.Comment</p>
+            </div>
+        </div>
+        <div class="row pt-3">
+            <div class="col-4">
+                Comentario de Revisión
+            </div>
+            <div class="col-8">
+                <InputTextArea Class="form-control" @bind-Value="@reviewComment" rows="3" placeholder="Opcional: Agregue un comentario sobre su decisión"></InputTextArea>
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideReviewModalClick">Cancelar</Button>
+        </div>
+        <div class="col-3">
+            <Button @ref="buttonReview" Class="btn form-control" Color="@(isApproving ? ButtonColor.Success : ButtonColor.Danger)" @onclick="ConfirmReview" disabled="@preventDoubleClick">
+                @(isApproving ? "Aprobar" : "Rechazar")
+            </Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+@code {
+    [Inject] ToastService ToastService { get; set; }
+    [Inject] protected PreloadService PreloadService { get; set; }
+
+    private Modal reviewModal = default!;
+    private Grid<ExtraHours> grid = default!;
+    private Grid<ExtraHours> historyGrid = default!;
+    private Button buttonReview = default!;
+
+    private List<ExtraHours> _pendingExtraHours = new List<ExtraHours>();
+    private List<ExtraHours> _reviewedExtraHours = new List<ExtraHours>();
+
+    // Review modal variables
+    private ExtraHours? selectedExtraHours;
+    private string reviewComment = "";
+    private bool isApproving = false;
+    private bool preventDoubleClick = false;
+    private string modalTitle => isApproving ? "Aprobar Horas Extra" : "Rechazar Horas Extra";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (!_authService.IsLoggedIn)
+            {
+                navigationManager.NavigateTo("/");
+            }
+            else
+            {
+                var uri = navigationManager.Uri;
+                await localStorage.SetItemAsync("lastUrl", uri);
+                await localStorage.SetItemAsync("huboRecarga", false);
+            }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            PreloadService.Show();
+
+            // Check if user is a supervisor
+            if (_authService.User.ProfileId != (short)ProfileTypes.GestorProyectos && 
+                _authService.User.ProfileId != (short)ProfileTypes.Administrador)
+            {
+                navigationManager.NavigateTo("/");
+                return;
+            }
+
+            await GetGrid();
+
+            await base.OnInitializedAsync();
+        }
+        catch (Exception ex)
+        {
+            ShowError("Error", "Error inesperado al cargar los datos");
+        }
+        finally
+        {
+            PreloadService.Hide();
+        }
+    }
+
+    private async Task GetGrid()
+    {
+        try
+        {
+            _pendingExtraHours = await _extraHoursService.GetPendingForSupervisorAsync(_authService.User.Id);
+            
+            // Get reviewed extra hours for the last 30 days
+            var thirtyDaysAgo = DateTime.Now.AddDays(-30);
+            var allSupervisedExtraHours = await _extraHoursService.GetPendingForSupervisorAsync(_authService.User.Id);
+            // Note: This would need a separate method to get all extra hours for supervised users, not just pending ones
+            // For now, we'll use a simple approach
+            
+            _reviewedExtraHours = (await _extraHoursService.GetByDateRangeAsync(thirtyDaysAgo, DateTime.Now))
+                .Where(eh => eh.Status != (short)ExtraHoursStatus.EnEvaluacion && eh.ReviewedBy == _authService.User.Id)
+                .OrderByDescending(eh => eh.Reviewed)
+                .ToList();
+
+            if (grid != null)
+            {
+                await grid.RefreshDataAsync();
+            }
+            if (historyGrid != null)
+            {
+                await historyGrid.RefreshDataAsync();
+            }
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            ShowError("Error", "Error al cargar las solicitudes de horas extra");
+        }
+    }
+
+    private async Task OnApproveClick(ExtraHours extraHours)
+    {
+        selectedExtraHours = extraHours;
+        isApproving = true;
+        reviewComment = "";
+        await reviewModal?.ShowAsync();
+    }
+
+    private async Task OnRejectClick(ExtraHours extraHours)
+    {
+        selectedExtraHours = extraHours;
+        isApproving = false;
+        reviewComment = "";
+        await reviewModal?.ShowAsync();
+    }
+
+    private async Task ConfirmReview()
+    {
+        if (selectedExtraHours == null) return;
+
+        try
+        {
+            preventDoubleClick = true;
+            buttonReview.ShowLoading();
+
+            if (isApproving)
+            {
+                await _extraHoursService.ApproveAsync(selectedExtraHours.Id, _authService.User.Id, reviewComment);
+                ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Horas extra aprobadas con éxito.",
+                    Title = "Aprobación"
+                });
+            }
+            else
+            {
+                await _extraHoursService.RejectAsync(selectedExtraHours.Id, _authService.User.Id, reviewComment);
+                ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Horas extra rechazadas con éxito.",
+                    Title = "Rechazo"
+                });
+            }
+
+            await GetGrid();
+            await OnHideReviewModalClick();
+        }
+        catch (Exception ex)
+        {
+            ShowError("Error", "Error al procesar la revisión");
+        }
+        finally
+        {
+            preventDoubleClick = false;
+            buttonReview.HideLoading();
+        }
+    }
+
+    private async Task OnHideReviewModalClick()
+    {
+        selectedExtraHours = null;
+        reviewComment = "";
+        await reviewModal?.HideAsync();
+    }
+
+    private void ShowError(string title, string message)
+    {
+        ToastService.Notify(new ToastMessage()
+        {
+            Type = ToastType.Danger,
+            Message = message,
+            Title = title
+        });
+    }
+}

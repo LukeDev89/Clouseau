@@ -62,4 +62,6 @@ public partial class ProjectTask
     public virtual ICollection<ProjectTaskEstimation> ProjectTaskEstimations { get; set; } = new List<ProjectTaskEstimation>();
 
     public virtual ICollection<ProjectTaskManagement> ProjectTaskManagements { get; set; } = new List<ProjectTaskManagement>();
+
+    public virtual ICollection<ExtraHours> ExtraHours { get; set; } = new List<ExtraHours>();
 }

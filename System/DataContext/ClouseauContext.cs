@@ -134,6 +134,8 @@ public partial class ClouseauContext : DbContext
 
     public virtual DbSet<UserTeam> UserTeams { get; set; }
 
+    public virtual DbSet<ExtraHours> ExtraHours { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         => optionsBuilder.UseSqlServer("Name=ClouseauContext");
 
@@ -1185,9 +1187,6 @@ public partial class ClouseauContext : DbContext
             entity.Property(e => e.Hours)
                 .HasColumnType("decimal(5, 2)")
                 .HasColumnName("hours");
-            entity.Property(e => e.ExtraHours)
-                .HasColumnType("decimal(5, 2)")
-                .HasColumnName("extraHours");
             entity.Property(e => e.TaskId).HasColumnName("taskId");
             entity.Property(e => e.TaskTypeId).HasColumnName("taskTypeId");
             entity.Property(e => e.UserAuditId).HasColumnName("userAuditId");
@@ -1445,6 +1444,59 @@ public partial class ClouseauContext : DbContext
             entity.Property(e => e.TeamId).HasColumnName("teamId");
             entity.Property(e => e.Temporary).HasColumnName("temporary");
             entity.Property(e => e.UserId).HasColumnName("userId");
+        });
+
+        modelBuilder.Entity<ExtraHours>(entity =>
+        {
+            entity.ToTable("ExtraHours");
+
+            entity.Property(e => e.Comment)
+                .HasMaxLength(250)
+                .IsFixedLength()
+                .HasColumnName("comment");
+            entity.Property(e => e.Created)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime")
+                .HasColumnName("created");
+            entity.Property(e => e.Date)
+                .HasColumnType("datetime")
+                .HasColumnName("date");
+            entity.Property(e => e.Hours)
+                .HasColumnType("decimal(5, 2)")
+                .HasColumnName("hours");
+            entity.Property(e => e.ReviewComment)
+                .HasMaxLength(250)
+                .IsFixedLength()
+                .HasColumnName("reviewComment");
+            entity.Property(e => e.Reviewed)
+                .HasColumnType("datetime")
+                .HasColumnName("reviewed");
+            entity.Property(e => e.ReviewedBy).HasColumnName("reviewedBy");
+            entity.Property(e => e.Status)
+                .HasDefaultValueSql("((1))")
+                .HasColumnName("status");
+            entity.Property(e => e.TaskId).HasColumnName("taskId");
+            entity.Property(e => e.TaskTypeId).HasColumnName("taskTypeId");
+            entity.Property(e => e.UserId).HasColumnName("userId");
+
+            entity.HasOne(d => d.Task).WithMany(p => p.ExtraHours)
+                .HasForeignKey(d => d.TaskId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ExtraHours_Tasks");
+
+            entity.HasOne(d => d.TaskType).WithMany(p => p.ExtraHours)
+                .HasForeignKey(d => d.TaskTypeId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ExtraHours_TaskTypes");
+
+            entity.HasOne(d => d.User).WithMany(p => p.ExtraHours)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ExtraHours_Users");
+
+            entity.HasOne(d => d.ReviewedByUser).WithMany(p => p.ExtraHoursReviewed)
+                .HasForeignKey(d => d.ReviewedBy)
+                .HasConstraintName("FK_ExtraHours_ReviewedBy_Users");
         });
 
         OnModelCreatingPartial(modelBuilder);

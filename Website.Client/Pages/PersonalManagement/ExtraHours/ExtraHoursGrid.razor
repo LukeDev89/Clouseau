@@ -1,0 +1,388 @@
+﻿@using BlazorBootstrap
+@using DataContext
+@using DataModel.Dto
+@using DataModel.Enums
+@using DataModel.Request
+@using DataService.Auth
+@using DataService.Interfaces.Management
+@using DataService.Interfaces.ProjectManagement
+@using DataService.Interfaces.SystemManagement
+@using System.Globalization
+
+@using Microsoft.AspNetCore.Components
+
+@page "/extra-hours"
+
+@inject IProjectTaskService _projectTaskService
+@inject ITaskTypeService _taskTypeService
+@inject IExtraHoursService _extraHoursService
+@inject AuthService _authService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject IJSRuntime JS
+@inject NavigationManager navigationManager
+
+<h3>Gestión de Horas Extra</h3>
+
+<div class="row">
+    <div class="col-12">
+        <Alert Color="AlertColor.Info">
+            <Icon Name="IconName.InfoCircleFill" class="me-2"></Icon>
+            Las horas extra deben ser sometidas para aprobación por su supervisor.
+        </Alert>
+    </div>
+</div>
+
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <Button Class="btn btn-primary" @onclick="OnShowModalClick">
+            <Icon Name="IconName.PlusCircle" class="me-2"></Icon>
+            Solicitar Horas Extra
+        </Button>
+    </div>
+</div>
+
+<br />
+
+<div class="row">
+    <div class="col-12">
+        <Grid TItem="ExtraHours" @ref="grid"
+              Data="_extraHours"
+              Class="table table-hover table-bordered table-striped text-nowrap"
+              AllowSorting="true"
+              AllowFiltering="true"
+              Responsive="true"
+              Unit="Unit.Px">
+
+            <GridColumn TItem="ExtraHours" HeaderText="Fecha" SortKeySelector="item => item.Date" PropertyName="Date" FilterOperator="FilterOperator.Contains">
+                @context.Date.ToString("dd/MM/yyyy")
+            </GridColumn>
+
+            <GridColumn TItem="ExtraHours" HeaderText="Tarea" SortKeySelector="item => item.Task.Name" PropertyName="Task.Name" FilterOperator="FilterOperator.Contains">
+                <div title="@context.Task.Name" style="max-width: 30ch; overflow: hidden; text-overflow: ellipsis;">
+                    @context.Task.Name
+                </div>
+            </GridColumn>
+
+            <GridColumn TItem="ExtraHours" HeaderText="Tipo" SortKeySelector="item => item.TaskType.Name" PropertyName="TaskType.Name" FilterOperator="FilterOperator.Contains">
+                @context.TaskType.Name
+            </GridColumn>
+
+            <GridColumn TItem="ExtraHours" HeaderText="Horas" TextAlignment="Alignment.End" SortKeySelector="item => item.Hours" PropertyName="Hours" Filterable="false">
+                @context.Hours
+            </GridColumn>
+
+            <GridColumn TItem="ExtraHours" HeaderText="Estado" SortKeySelector="item => item.Status" PropertyName="Status" FilterOperator="FilterOperator.Contains">
+                @if (context.Status == 1)
+                {
+                    <Badge Color="BadgeColor.Warning">En Evaluación</Badge>
+                }
+                else if (context.Status == 2)
+                {
+                    <Badge Color="BadgeColor.Success">Aprobadas</Badge>
+                }
+                else if (context.Status == 3)
+                {
+                    <Badge Color="BadgeColor.Danger">Rechazadas</Badge>
+                }
+                else
+                {
+                    <Badge Color="BadgeColor.Secondary">Desconocido</Badge>
+                }
+            </GridColumn>
+
+            <GridColumn TItem="ExtraHours" HeaderText="Comentario" SortKeySelector="item => item.Comment" PropertyName="Comment" FilterOperator="FilterOperator.Contains">
+                <div title="@context.Comment" style="max-width: 40ch; overflow: hidden; text-overflow: ellipsis;">
+                    @context.Comment
+                </div>
+            </GridColumn>
+
+            <GridColumn TItem="ExtraHours" HeaderText="Acciones" Sortable="false" Filterable="false">
+                <div class="row">
+                    <div class="col-12 d-flex">
+                        @if (context.Status == (short)ExtraHoursStatus.EnEvaluacion)
+                        {
+                            <Button @onclick="async () => await OnEditClick(context)" Color="ButtonColor.Primary" Size="ButtonSize.Small" class="me-2">
+                                <Icon Name="IconName.PencilSquare"></Icon>
+                            </Button>
+                            <Button @onclick="async () => await OnDeleteClick(context.Id)" Color="ButtonColor.Danger" Size="ButtonSize.Small">
+                                <Icon Name="IconName.Trash"></Icon>
+                            </Button>
+                        }
+                    </div>
+                </div>
+            </GridColumn>
+        </Grid>
+    </div>
+</div>
+
+<Modal @ref="modal" Title="Solicitar Horas Extra" Size="ModalSize.Large">
+    <BodyTemplate>
+        <div class="row pt-3">
+            <div class="col-4">
+                Tarea
+            </div>
+            <div class="col-8">
+                <InputSelect class="form-select" @bind-Value="modalTaskId">
+                    <option selected value=-1 disabled>Seleccione una tarea</option>
+                    @foreach (var task in _projectTasks.Where(t => !t.Finished))
+                    {
+                        <option value=@task.Id>@task.Name - @task.ProjectName</option>
+                    }
+                </InputSelect>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-4">
+                Tipo de Tarea
+            </div>
+            <div class="col-8">
+                <InputSelect class="form-select" @bind-Value="modalTaskTypeId">
+                    <option selected value=-1 disabled>Seleccione un tipo</option>
+                    @foreach (var type in _taskTypes.Where(x => !x.Name.Contains("ndefinid")))
+                    {
+                        <option value=@type.Id>@type.Name</option>
+                    }
+                </InputSelect>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-4">
+                Fecha
+            </div>
+            <div class="col-8">
+                <DateInput Class="form-control" @bind-Value="@modalDate"></DateInput>
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-4">
+                Horas Extra
+            </div>
+            <div class="col-8">
+                <InputNumber Class="form-control" Min="0.5" Max="12" Step="0.5" @bind-Value="@modalHours" />
+            </div>
+        </div>
+        <div class="row pt-2">
+            <div class="col-4">
+                Comentario
+            </div>
+            <div class="col-8">
+                <InputTextArea Class="form-control" @bind-Value="@modalComment" rows="3" required></InputTextArea>
+            </div>
+        </div>
+    </BodyTemplate>
+    <FooterTemplate>
+        <div class="col-3">
+            <Button Class="btn form-control" Color="ButtonColor.Secondary" @onclick="OnHideModalClick">Cerrar</Button>
+        </div>
+        <div class="col-3">
+            <Button @ref="buttonSave" Class="btn form-control" Color="ButtonColor.Primary" @onclick="SaveExtraHours" disabled="@preventDoubleClick">Guardar</Button>
+        </div>
+    </FooterTemplate>
+</Modal>
+
+@code {
+    [Inject] ToastService ToastService { get; set; }
+    [Inject] protected PreloadService PreloadService { get; set; }
+
+    private Modal modal = default!;
+    private Grid<ExtraHours> grid = default!;
+    private Button buttonSave = default!;
+
+    private List<ExtraHours> _extraHours = new List<ExtraHours>();
+    private List<ProjectTask> _projectTasks = new List<ProjectTask>();
+    private List<TaskType> _taskTypes = new List<TaskType>();
+
+    // Modal variables
+    public long modalTaskId { get; set; } = -1;
+    public long modalTaskTypeId { get; set; } = -1;
+    public string modalComment { get; set; } = "";
+    public DateTime modalDate { get; set; } = DateTime.Now;
+    public decimal modalHours = 1;
+    
+    private bool isEdit { get; set; } = false;
+    private long editingId { get; set; } = 0;
+    
+    private bool preventDoubleClick { get; set; } = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (!_authService.IsLoggedIn)
+            {
+                navigationManager.NavigateTo("/");
+            }
+            else
+            {
+                var uri = navigationManager.Uri;
+                await localStorage.SetItemAsync("lastUrl", uri);
+                await localStorage.SetItemAsync("huboRecarga", false);
+            }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            PreloadService.Show();
+
+            await GetCombo();
+            await GetGrid();
+
+            await base.OnInitializedAsync();
+        }
+        catch (Exception ex)
+        {
+            ShowError("Error", "Error inesperado al cargar los datos");
+        }
+        finally
+        {
+            PreloadService.Hide();
+        }
+    }
+
+    private async Task GetCombo()
+    {
+        _taskTypes = await _taskTypeService.GetAsync();
+        _projectTasks = await _projectTaskService.GetByUserIdAsync(_authService.User.Id);
+    }
+
+    private async Task GetGrid()
+    {
+        try
+        {
+            _extraHours = await _extraHoursService.GetByUserIdAsync(_authService.User.Id);
+            if (grid != null)
+            {
+                await grid.RefreshDataAsync();
+            }
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            ShowError("Error", "Error al cargar las horas extra");
+        }
+    }
+
+    private async Task SaveExtraHours()
+    {
+        try
+        {
+            preventDoubleClick = true;
+            buttonSave.ShowLoading();
+
+            if (modalTaskId == -1) { ShowError("Validación", "Debe seleccionar una tarea"); return; }
+            if (modalTaskTypeId == -1) { ShowError("Validación", "Debe seleccionar un tipo de tarea"); return; }
+            if (modalHours <= 0) { ShowError("Validación", "Debe ingresar horas válidas"); return; }
+            if (string.IsNullOrWhiteSpace(modalComment)) { ShowError("Validación", "Debe ingresar un comentario explicando las horas extra"); return; }
+            if (modalDate.Date > DateTime.Now.Date) { ShowError("Validación", "La fecha no puede ser futura"); return; }
+
+            var extraHours = new ExtraHours()
+            {
+                Id = editingId,
+                UserId = _authService.User.Id,
+                TaskId = modalTaskId,
+                TaskTypeId = modalTaskTypeId,
+                Date = modalDate,
+                Hours = modalHours,
+                Comment = modalComment
+            };
+
+            if (isEdit)
+            {
+                await _extraHoursService.EditAsync(extraHours);
+                ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Horas extra actualizadas con éxito.",
+                    Title = "Horas Extra"
+                });
+            }
+            else
+            {
+                await _extraHoursService.AddAsync(extraHours);
+                ToastService.Notify(new ToastMessage()
+                {
+                    Type = ToastType.Success,
+                    Message = "Solicitud de horas extra enviada para aprobación.",
+                    Title = "Horas Extra"
+                });
+            }
+
+            await GetGrid();
+            await OnHideModalClick();
+        }
+        catch (Exception ex)
+        {
+            ShowError("Error", "Error inesperado al guardar las horas extra");
+        }
+        finally
+        {
+            preventDoubleClick = false;
+            buttonSave.HideLoading();
+        }
+    }
+
+    private async Task OnShowModalClick()
+    {
+        modalTaskId = -1;
+        modalTaskTypeId = -1;
+        modalComment = "";
+        modalDate = DateTime.Now;
+        modalHours = 1;
+        isEdit = false;
+        editingId = 0;
+
+        await modal?.ShowAsync();
+    }
+
+    private async Task OnEditClick(ExtraHours extraHours)
+    {
+        modalTaskId = extraHours.TaskId;
+        modalTaskTypeId = extraHours.TaskTypeId;
+        modalComment = extraHours.Comment;
+        modalDate = extraHours.Date;
+        modalHours = extraHours.Hours;
+        isEdit = true;
+        editingId = extraHours.Id;
+
+        await modal?.ShowAsync();
+    }
+
+    private async Task OnDeleteClick(long id)
+    {
+        try
+        {
+            await _extraHoursService.DeleteAsync(id);
+            ToastService.Notify(new ToastMessage()
+            {
+                Type = ToastType.Success,
+                Message = "Solicitud de horas extra eliminada.",
+                Title = "Horas Extra"
+            });
+            await GetGrid();
+        }
+        catch (Exception ex)
+        {
+            ShowError("Error", "Error al eliminar la solicitud de horas extra");
+        }
+    }
+
+    private async Task OnHideModalClick()
+    {
+        await modal?.HideAsync();
+    }
+
+    private void ShowError(string title, string message)
+    {
+        ToastService.Notify(new ToastMessage()
+        {
+            Type = ToastType.Danger,
+            Message = message,
+            Title = title
+        });
+    }
+}

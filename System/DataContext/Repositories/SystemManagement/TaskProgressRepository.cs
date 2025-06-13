@@ -43,7 +43,6 @@ namespace DataContext.Repositories.Management
                         TaskId = r.TaskId,
                         UserId = r.UserId,
                         Hours = r.Hours,
-                        ExtraHours = r.ExtraHours,
                         Comment = string.IsNullOrEmpty(r.Comment) ? "" : r.Comment,
                         TaskTypeId = r.TaskTypeId,
                         Date = r.Date
@@ -67,7 +66,6 @@ namespace DataContext.Repositories.Management
                 var taskProgress = await _context.TaskProgresses.FirstAsync(x => x.Id == r.ProgressId);
 
                 taskProgress.Hours = r.Hours;
-                taskProgress.ExtraHours = r.ExtraHours;
                 taskProgress.Comment = string.IsNullOrEmpty(r.Comment) ? "" : r.Comment;
                 taskProgress.TaskTypeId = r.TaskTypeId;
                 taskProgress.Date = r.Date;
@@ -93,75 +91,35 @@ namespace DataContext.Repositories.Management
         {
             using var _context = _contextFactory.CreateDbContext();
 
-            var query = @$"
-                DECLARE @InicioPeriodo DATE = '{desde:yyyy-MM-dd}';  -- Fecha desde
-                DECLARE @FinPeriodo DATE = '{hasta:yyyy-MM-dd}';    -- Fecha hasta
-
-                -- Horas extras incurridas en días hábiles (horas cargadas - 8).
-                SELECT 
-                    (RTRIM(u.lastname) + ', ' + RTRIM(u.firstname)) AS Integrante,
-                    CONVERT(DATE, dh.Fecha) AS Fecha,
-                    COALESCE(SUM(a.hours) - 8, 0) AS HorasExtras,  -- Calcula horas extras
-                    CASE 
-                        WHEN COALESCE(SUM(a.hours), 0) > 8 THEN 'Horas extra'
-                        ELSE 'Horas normales'
-                    END AS Estado
-                FROM 
-                    [dbo].[Users] u 
-                CROSS JOIN 
-                    dbo.fn_ObtenerDiasHabilesInicioFin(@InicioPeriodo, @FinPeriodo) AS dh
-                LEFT JOIN 
-                    [dbo].[TaskProgress] a ON a.userid = u.id AND CAST(a.date AS DATE) = dh.Fecha
-                GROUP BY 
-                    u.lastname, u.firstname, dh.Fecha
-                HAVING 
-                    COALESCE(SUM(a.hours), 0) > 8
-
-                UNION ALL
-
-                -- Horas incurridas en días no hábiles (total horas).
-                SELECT 
-                    (RTRIM(u.lastname) + ', ' + RTRIM(u.firstname)) AS Integrante,
-                    CAST(a.date AS DATE) AS Fecha,
-                    COALESCE(SUM(a.hours), 0) AS HorasCargadas,  -- Total de horas en días no hábiles
-                    'Trabajo en día no hábil' AS Estado
-                FROM 
-                    [dbo].[Users] u 
-                LEFT JOIN 
-                    [dbo].[TaskProgress] a ON a.userid = u.id
-                WHERE 
-                    CAST(a.date AS DATE) BETWEEN @InicioPeriodo AND @FinPeriodo AND 
-                    CAST(a.date AS DATE) NOT IN (SELECT Fecha FROM dbo.fn_ObtenerDiasHabilesInicioFin(@InicioPeriodo, @FinPeriodo))
-                GROUP BY 
-                    u.lastname, u.firstname, CAST(a.date AS DATE)
-                HAVING 
-                    COALESCE(SUM(a.hours), 0) > 0
-
-                ORDER BY 
-                    Integrante, Fecha;
-            ";
-
-            using var command = _context.Database.GetDbConnection().CreateCommand();
-            command.CommandText = query;
-
-            _context.Database.OpenConnection();
-
-            using var result = command.ExecuteReader();
+            var extraHours = await _context.ExtraHours
+                .Include(eh => eh.User)
+                .Include(eh => eh.Task)
+                .Include(eh => eh.TaskType)
+                .Where(eh => eh.Date >= desde && eh.Date <= hasta)
+                .ToListAsync();
 
             var horasExtrasResults = new List<ExtraHoursView>();
 
-            while (result.Read())
+            foreach (var eh in extraHours)
             {
+                string estado = eh.Status switch
+                {
+                    1 => "En Evaluación",
+                    2 => "Aprobadas",
+                    3 => "Rechazadas",
+                    _ => "Desconocido"
+                };
+
                 horasExtrasResults.Add(new ExtraHoursView
                 {
-                    Integrante = result.GetString(0),
-                    Fecha = result.GetDateTime(1),
-                    Horas = result.GetDecimal(2),
-                    Estado = result.GetString(3),
+                    Integrante = eh.User.UserFullName,
+                    Fecha = eh.Date,
+                    Horas = eh.Hours,
+                    Estado = estado,
                 });
             }
 
-            return horasExtrasResults;
+            return horasExtrasResults.OrderBy(h => h.Integrante).ThenBy(h => h.Fecha).ToList();
         }
 
         public async Task<List<IncompleteHoursView>> GetIncompleteWorkHoursView(long userId, DateTime desde, DateTime hasta)
