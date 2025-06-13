@@ -3,19 +3,23 @@ using DataContext;
 using DataContext.Interfaces;
 using DataContext.Interfaces.Management;
 using DataContext.Interfaces.ProjectManagement;
+using DataContext.Interfaces.SystemManagement;
 using DataContext.Repositories;
 using DataContext.Repositories.Management;
 using DataContext.Repositories.ProjectManagement;
+using DataContext.Repositories.SystemManagement;
 using DataService.Auth;
 using DataService.Interfaces.GadgetExpress;
 using DataService.Interfaces.Management;
 using DataService.Interfaces.ProjectManagement;
 using DataService.Interfaces.SonarQube;
+using DataService.Interfaces.SystemManagement;
 using DataService.Interfaces.VersionControl;
 using DataService.Services.GadgetExpress;
 using DataService.Services.Management;
 using DataService.Services.ProjectManagement;
 using DataService.Services.SonarQube;
+using DataService.Services.SystemManagement;
 using DataService.Services.VersionControl;
 using DataService.State;
 using Microsoft.EntityFrameworkCore;
@@ -91,6 +95,7 @@ builder.Services.AddTransient<IResponsibleService, ResponsibleService>();
 builder.Services.AddTransient<IProjectTaskEstimationService, ProjectTaskEstimationService>();
 builder.Services.AddTransient<IUserTeamService, UserTeamService>();
 builder.Services.AddTransient<ISectionService, SectionService>();
+builder.Services.AddTransient<IExtraHoursService, ExtraHoursService>();
 
 builder.Services.AddTransient<IProjectRepository, ProjectRepository>();
 builder.Services.AddTransient<IUserRepository, UserRepository>();
@@ -131,6 +136,7 @@ builder.Services.AddTransient<IResponsibleRepository, ResponsibleRepository>();
 builder.Services.AddTransient<IProjectTaskEstimationRepository, ProjectTaskEstimationRepository>();
 builder.Services.AddTransient<IUserTeamRepository, UserTeamRepository>();
 builder.Services.AddTransient<ISectionRepository, SectionRepository>();
+builder.Services.AddTransient<IExtraHoursRepository, ExtraHoursRepository>();
 
 
 // Configuraciones
