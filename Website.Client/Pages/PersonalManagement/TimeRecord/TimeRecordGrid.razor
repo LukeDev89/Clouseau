@@ -103,19 +103,8 @@
                                     var hoursForDate = _workPerTaskToShow
                                     .Where(x => x.Date == date && x.Task == taskEntry.Task && x.TaskType == taskEntry.TaskType)
                                     .Sum(x => x.Hours);
-                                    var extraHoursForDate = _workPerTaskToShow
-                                    .Where(x => x.Date == date && x.Task == taskEntry.Task && x.TaskType == taskEntry.TaskType)
-                                    .Sum(x => x.ExtraHours);
                                 }
-                                @if (extraHoursForDate > 0)
-                                {
-                                    <div>@hoursForDate</div>
-                                    <div style="color: #ff6600; font-weight: bold; font-size: 0.9em;">+@extraHoursForDate</div>
-                                }
-                                else
-                                {
-                                    @hoursForDate
-                                }
+                                @hoursForDate
                             </td>
                         }
                     </tr>
@@ -126,7 +115,6 @@
                     @foreach (var date in _daysToShow)
                     {
                         var total = _workPerTaskToShow.Where(x => x.Date == date).Sum(x => x.Hours);
-                        var extraTotal = _workPerTaskToShow.Where(x => x.Date == date).Sum(x => x.ExtraHours);
 
                         string statusColor;
                         string moodFace;
@@ -152,12 +140,6 @@
                                 <strong>
                                     @total
                                 </strong>
-                                @if (extraTotal > 0)
-                                {
-                                    <strong style="color: #ff6600; font-size: 0.9em;">
-                                        +@extraTotal
-                                    </strong>
-                                }
                             </div>
                             <div style="width: 50px; height: 2px; background-color: @statusColor">
                             </div>
@@ -213,14 +195,9 @@
     <GridColumn TItem="ProjectTask" HeaderText="Horas" TextAlignment="Alignment.End" Sortable="false" PropertyName="Completed" Filterable="false">
         @{
             var normalHours = context.TaskProgresses.Where(u => u.UserId == _authService.User.Id).Sum(x => x.Hours);
-            var extraHours = context.TaskProgresses.Where(u => u.UserId == _authService.User.Id).Sum(x => x.ExtraHours);
         }
         <div style="display: flex; flex-direction: column; align-items: flex-end;">
             <div>@normalHours</div>
-            @if (extraHours > 0)
-            {
-                <div style="color: #ff6600; font-weight: bold; font-size: 0.9em;">+@extraHours</div>
-            }
         </div>
     </GridColumn>
 
@@ -323,20 +300,6 @@
         </div>
         <div class="row pt-2">
             <div class="col-4">
-                Horas Extra
-            </div>
-            <div class="col-4">
-                <InputNumber Class="form-control" Min="0" Max="180" Step="0.01" @bind-Value="@modalExtraHours" />
-            </div>
-            @if (dateToDisabled)
-            {
-                <div class="col-4 d-flex align-items-center">
-                    @modalExtraHours Hora(s) extra
-                </div>
-            }
-        </div>
-        <div class="row pt-2">
-            <div class="col-4">
                 Comentarios
             </div>
             <div class="col-8">
@@ -409,20 +372,6 @@
                                                 <span>&nbsp;Horas</span>
                                             }
                                         </div>
-                                        @if (c.ExtraHours > 0)
-                                        {
-                                            <div style="color: #ff6600; font-weight: bold; font-size: 0.9em;">
-                                                +@c.ExtraHours
-                                                @if (c.ExtraHours == 1)
-                                                {
-                                                    <span>&nbsp;Extra</span>
-                                                }
-                                                else
-                                                {
-                                                    <span>&nbsp;Extra</span>
-                                                }
-                                            </div>
-                                        }
                                     </div>
                                 </div>
                             </div>
@@ -475,7 +424,6 @@
     public DateTime modalDate { get; set; } = DateTime.Now;
     public DateTime? modalDateTo { get; set; } = null;
     public decimal modalHours = 1;
-    public decimal modalExtraHours = 0;
 
     private bool taskTypeDisabled { get; set; }
     private bool dateToDisabled { get; set; }
@@ -607,7 +555,7 @@
             preventDoubleClick = true;
             buttonSave.ShowLoading();
 
-            if (modalHours == 0 && modalExtraHours == 0) { ShowError("Carga de Horas", "Debe ingresar al menos horas normales o horas extra"); return; }
+            if (modalHours == 0) { ShowError("Carga de Horas", "Debe ingresar horas"); return; }
             if (modalDate > DateTime.Now) { ShowError("Carga de Horas", "La fecha debe ser menor o igual a hoy"); return; }
             if (modalTaskType == -1) { ShowError("Carga de Horas", "Debe seleccionar un tipo de tarea"); return; }
 
@@ -641,7 +589,6 @@
                             TaskId = modalTaskId,
                             UserId = modalUser,
                             Hours = (decimal)modalHours,
-                            ExtraHours = (decimal)modalExtraHours,
                             Comment = modalComment,
                             TaskTypeId = modalTaskType,
                             Date = day
@@ -662,7 +609,6 @@
                         TaskId = modalTaskId,
                         UserId = modalUser,
                         Hours = (decimal)modalHours,
-                        ExtraHours = (decimal)modalExtraHours,
                         Comment = modalComment,
                         TaskTypeId = modalTaskType,
                         Date = modalDate,
@@ -684,7 +630,6 @@
 
             modalTaskType = -1;
             modalHours = 1.00M;
-            modalExtraHours = 0M;
             modalComment = "";
 
             ToastService.Notify(new ToastMessage()
@@ -747,7 +692,6 @@
         modalName = "";
         modalDescription = "";
         modalHours = 1.00M;
-        modalExtraHours = 0M;
         modalComment = "";
         modalDate = DateTime.Now;
         modalDateTo = null;
@@ -817,7 +761,6 @@
         modalTaskId = task.TaskId;
         modalDate = task.Date;
         modalHours = task.Hours;
-        modalExtraHours = task.ExtraHours;
         modalComment = task.Comment;
         modalTaskType = task.TaskTypeId;
 

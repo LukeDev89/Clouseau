@@ -118,4 +118,8 @@ public partial class User
     public virtual ICollection<UserClientContract> UserClientContracts { get; set; } = new List<UserClientContract>();
 
     public virtual ICollection<UserPresence> UserPresences { get; set; } = new List<UserPresence>();
+
+    public virtual ICollection<ExtraHours> ExtraHours { get; set; } = new List<ExtraHours>();
+
+    public virtual ICollection<ExtraHours> ExtraHoursReviewed { get; set; } = new List<ExtraHours>();
 }
