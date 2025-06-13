@@ -13,7 +13,8 @@ namespace DataContext.Repositories.Management
 
         // TODO: These should be configurable or determined from the database
         private const long DEFAULT_LICENSE_TASK_ID = 1; // This should be the ID of a task for license hours
-        private const long DEFAULT_LICENSE_TASK_TYPE_ID = 1; // This should be the ID of a task type for license hours
+        private const long DEFAULT_LICENSE_TASK_TYPE_ID = 10007; // This should be the ID of a task type for license hours
+        private const long DEFAULT_PROJECT_ID = 2; // This should be the ID of a task type for license hours
         private const decimal DEFAULT_HOURS_PER_DAY = 8m; // Default hours per working day
 
         public UserNonworkingDaysRepository(IDbContextFactory<ClouseauContext> context)
@@ -194,7 +195,26 @@ namespace DataContext.Repositories.Management
 
             if (taskProgressRecords.Any())
             {
-                await _context.TaskProgresses.AddRangeAsync(taskProgressRecords);
+                var task = await _context.ProjectTasks.AddAsync(new ProjectTask()
+                {
+                    Active = false,
+                    CreationDate = DateTime.Now,
+                    EndDate = DateTime.Now,
+                    EstimatedHours = taskProgressRecords.Count * 8,
+                    Description = $"Licencia automática - {userNonworkingDay.Type?.Name ?? "Licencia"}",
+                    Finished = true,
+                    DeliverDate = DateTime.Now,
+                    InitDate = DateTime.Now,
+                    Name = "Licencia automática",
+                    ProjectId = DEFAULT_PROJECT_ID,
+                    TaskTypeId = DEFAULT_LICENSE_TASK_TYPE_ID
+				});
+
+				await _context.SaveChangesAsync();
+
+				taskProgressRecords.ForEach(x => x.TaskId = task.Entity.Id);
+
+				await _context.TaskProgresses.AddRangeAsync(taskProgressRecords);
                 await _context.SaveChangesAsync();
             }
         }
