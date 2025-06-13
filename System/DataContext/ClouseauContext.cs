@@ -1187,9 +1187,6 @@ public partial class ClouseauContext : DbContext
             entity.Property(e => e.Hours)
                 .HasColumnType("decimal(5, 2)")
                 .HasColumnName("hours");
-            entity.Property(e => e.ExtraHours)
-                .HasColumnType("decimal(5, 2)")
-                .HasColumnName("extraHours");
             entity.Property(e => e.TaskId).HasColumnName("taskId");
             entity.Property(e => e.TaskTypeId).HasColumnName("taskTypeId");
             entity.Property(e => e.UserAuditId).HasColumnName("userAuditId");

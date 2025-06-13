@@ -186,7 +186,6 @@ namespace DataContext.Repositories.Management
                 TaskId = DEFAULT_LICENSE_TASK_ID,
                 UserId = userNonworkingDay.UserId,
                 Hours = DEFAULT_HOURS_PER_DAY,
-                ExtraHours = 0m,
                 Comment = $"Licencia automática - {userNonworkingDay.Type?.Name ?? "Licencia"}",
                 TaskTypeId = DEFAULT_LICENSE_TASK_TYPE_ID,
                 Date = day
