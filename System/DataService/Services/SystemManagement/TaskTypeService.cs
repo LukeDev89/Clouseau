@@ -14,12 +14,12 @@ namespace DataService.Services.Management
             _repository = repository;
         }
 
-        public async Task AddAsync(TaskType taskType) => await _repository.AddAsync(taskType);
+        public async Task AddAsync(ProjectTaskType taskType) => await _repository.AddAsync(taskType);
 
         public async Task DeleteAsync(long id) => await _repository.DeleteAsync(id);
 
-        public async Task EditAsync(TaskType taskType) => await _repository.EditAsync(taskType);
+        public async Task EditAsync(ProjectTaskType taskType) => await _repository.EditAsync(taskType);
 
-        public async Task<List<TaskType>> GetAsync() => await _repository.GetAsync();
+        public async Task<List<ProjectTaskType>> GetAsync() => await _repository.GetAsync();
     }
 }

@@ -87,7 +87,7 @@ public partial class User
         } 
     }
 
-    public virtual ICollection<TaskProgress> TaskProgresses { get; set; } = new List<TaskProgress>();
+    public virtual ICollection<ProjectTaskProgress> TaskProgresses { get; set; } = new List<ProjectTaskProgress>();
 
     public virtual ICollection<UserTeam> UserTeams { get; set; } = new List<UserTeam>();
 
@@ -113,7 +113,7 @@ public partial class User
 
     public virtual ICollection<ResourceWarning> ResourceWarningUsers { get; set; } = new List<ResourceWarning>();
 
-    public virtual ICollection<TaskProgress> TaskProgressUserAudits { get; set; } = new List<TaskProgress>();
+    public virtual ICollection<ProjectTaskProgress> TaskProgressUserAudits { get; set; } = new List<ProjectTaskProgress>();
 
     public virtual ICollection<UserClientContract> UserClientContracts { get; set; } = new List<UserClientContract>();
 

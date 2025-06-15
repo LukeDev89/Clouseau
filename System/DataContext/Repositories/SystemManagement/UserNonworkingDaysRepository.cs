@@ -182,7 +182,7 @@ namespace DataContext.Repositories.Management
             var workingDays = GetWorkingDaysInPeriod(userNonworkingDay.DateFrom.Date, userNonworkingDay.DateTo.Date, holidays);
 
             // Create TaskProgress records for each working day
-            var taskProgressRecords = workingDays.Select(day => new TaskProgress
+            var taskProgressRecords = workingDays.Select(day => new ProjectTaskProgress
             {
                 TaskId = DEFAULT_LICENSE_TASK_ID,
                 UserId = userNonworkingDay.UserId,

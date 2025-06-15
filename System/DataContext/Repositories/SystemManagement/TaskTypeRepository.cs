@@ -12,7 +12,7 @@ namespace DataContext.Repositories.Management
             _contextFactory = context;
         }
 
-        public async Task<List<TaskType>> GetAsync()
+        public async Task<List<ProjectTaskType>> GetAsync()
         {
             using var _context = await _contextFactory.CreateDbContextAsync();
             return await _context.TaskTypes.OrderBy(x => x.Name).ToListAsync();
@@ -37,7 +37,7 @@ namespace DataContext.Repositories.Management
             await _context.SaveChangesAsync();
         }
 
-        public async Task EditAsync(TaskType taskType)
+        public async Task EditAsync(ProjectTaskType taskType)
         {
             using var _context = await _contextFactory.CreateDbContextAsync();
 
@@ -51,7 +51,7 @@ namespace DataContext.Repositories.Management
             await _context.SaveChangesAsync();
         }
 
-        public async Task AddAsync(TaskType taskType)
+        public async Task AddAsync(ProjectTaskType taskType)
         {
             using var _context = await _contextFactory.CreateDbContextAsync();
 

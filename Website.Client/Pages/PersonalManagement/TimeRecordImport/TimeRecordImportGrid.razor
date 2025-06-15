@@ -170,8 +170,8 @@
     private List<Project> _projects = new List<Project>();
     private long _projectId = -1;
 
-    private List<TaskProgress> _taskProgress = new List<TaskProgress>();
-    private List<TaskType> _taskTypes = new List<TaskType>();
+    private List<ProjectTaskProgress> _taskProgress = new List<ProjectTaskProgress>();
+    private List<ProjectTaskType> _taskTypes = new List<ProjectTaskType>();
 
     private List<HoursPerDayModel> _workDays = new List<HoursPerDayModel>();
     private List<HoursPerDayModel> _workDaysToShow = new List<HoursPerDayModel>();
@@ -435,7 +435,7 @@
 
                 if (taskType == null)
                 {
-                    await _taskTypeService.AddAsync(new TaskType()
+                    await _taskTypeService.AddAsync(new ProjectTaskType()
                         {
                             Name = i.Actividad
                         });

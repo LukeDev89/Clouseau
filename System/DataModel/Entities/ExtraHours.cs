@@ -35,7 +35,7 @@ public partial class ExtraHours
     
     public virtual ProjectTask Task { get; set; } = null!;
     
-    public virtual TaskType TaskType { get; set; } = null!;
+    public virtual ProjectTaskType TaskType { get; set; } = null!;
     
     public virtual User? ReviewedByUser { get; set; }
 }

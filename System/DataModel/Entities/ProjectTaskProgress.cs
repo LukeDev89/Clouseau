@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace DataContext;
 
-public partial class TaskProgress
+public partial class ProjectTaskProgress
 {
     public long Id { get; set; }
 
@@ -22,7 +22,7 @@ public partial class TaskProgress
 
     public long? UserAuditId { get; set; }
 
-    public virtual TaskType TaskType { get; set; } = null!;
+    public virtual ProjectTaskType TaskType { get; set; } = null!;
     public string TaskTypeName { get { return TaskType.Name; } }
 
     public virtual ProjectTask Task { get; set; } = null!;

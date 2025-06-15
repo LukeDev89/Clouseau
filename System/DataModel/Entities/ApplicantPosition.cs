@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace DataContext;
 
-public partial class ApplicantsPosition
+public partial class ApplicantPosition
 {
     public long Id { get; set; }
 

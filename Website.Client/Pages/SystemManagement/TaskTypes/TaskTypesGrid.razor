@@ -58,7 +58,7 @@
 <br />
 <br />
 
-<Grid TItem="TaskType" @ref="grid"
+<Grid TItem="ProjectTaskType" @ref="grid"
       Class="table table-hover table-bordered table-striped"
       Data="_taskTypes"
       AllowSorting="true"
@@ -67,15 +67,15 @@
       PageSize="8"
       Responsive="true">
 
-    <GridColumn TItem="TaskType" HeaderText="Nombre" SortKeySelector="item => item.Name" PropertyName="Name" FilterOperator="FilterOperator.Contains">
+    <GridColumn TItem="ProjectTaskType" HeaderText="Nombre" SortKeySelector="item => item.Name" PropertyName="Name" FilterOperator="FilterOperator.Contains">
         @context.Name
     </GridColumn>
 
-    <GridColumn TItem="TaskType" HeaderText="Descripción" SortKeySelector="item => item.Description" PropertyName="Description" FilterOperator="FilterOperator.Contains">
+    <GridColumn TItem="ProjectTaskType" HeaderText="Descripción" SortKeySelector="item => item.Description" PropertyName="Description" FilterOperator="FilterOperator.Contains">
         @context.Description
     </GridColumn>
 
-    <GridColumn TItem="TaskType" HeaderText="Acciones" Sortable="false" Filterable="false">
+    <GridColumn TItem="ProjectTaskType" HeaderText="Acciones" Sortable="false" Filterable="false">
         <div class="row">
             <div class="col-12 d-flex">
                 <Button @onclick="async () => await OnShowModalClick(context)">
@@ -127,20 +127,20 @@
 @code {
     [Inject] ToastService ToastService { get; set; }
     private Collapse collapseAgregar;
-    private Grid<TaskType> grid;
+    private Grid<ProjectTaskType> grid;
 
     private Modal modal;
     private long modalId { get; set; }
     private string modalName { get; set; } = "";
     private string modalDescription { get; set; } = "";
-    private TaskType editTaskType { get; set; } = new TaskType();
+    private ProjectTaskType editTaskType { get; set; } = new ProjectTaskType();
 
     private string createName { get; set; } = "";
     private string createDescription { get; set; } = "";
-    private TaskType createTaskType { get; set; } = new TaskType();
+    private ProjectTaskType createTaskType { get; set; } = new ProjectTaskType();
 
 
-    private List<TaskType> _taskTypes = new List<TaskType>();
+    private List<ProjectTaskType> _taskTypes = new List<ProjectTaskType>();
 
     protected override async Task OnInitializedAsync()
     {
@@ -255,7 +255,7 @@
         }
     }
 
-    private async Task OnShowModalClick(TaskType taskType)
+    private async Task OnShowModalClick(ProjectTaskType taskType)
     {
         //modalId = id;
         //modalName = name;

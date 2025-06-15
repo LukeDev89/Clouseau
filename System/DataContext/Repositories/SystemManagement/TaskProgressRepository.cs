@@ -15,13 +15,13 @@ namespace DataContext.Repositories.Management
             _contextFactory = context;
         }
 
-        public async Task<List<TaskProgress>> GetAsync()
+        public async Task<List<ProjectTaskProgress>> GetAsync()
         {
             using var _context = _contextFactory.CreateDbContext();
             return await _context.TaskProgresses.ToListAsync();
         }
 
-        public async Task<List<TaskProgress>> GetByTaskIdAsync(long taskId)
+        public async Task<List<ProjectTaskProgress>> GetByTaskIdAsync(long taskId)
         {
             using var _context = _contextFactory.CreateDbContext();
 
@@ -38,7 +38,7 @@ namespace DataContext.Repositories.Management
                 {
                     if (r.Date > DateTime.Now) break;
 
-                    await _context.TaskProgresses.AddAsync(new TaskProgress()
+                    await _context.TaskProgresses.AddAsync(new ProjectTaskProgress()
                     {
                         TaskId = r.TaskId,
                         UserId = r.UserId,

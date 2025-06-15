@@ -6,12 +6,12 @@ namespace DataService.Interfaces.Management
 {
     public interface ITaskTypeService
     {
-        Task<List<TaskType>> GetAsync();
+        Task<List<ProjectTaskType>> GetAsync();
 
         Task DeleteAsync(long id);
 
-        Task EditAsync(TaskType taskType);
+        Task EditAsync(ProjectTaskType taskType);
 
-        Task AddAsync(TaskType taskType);
+        Task AddAsync(ProjectTaskType taskType);
     }
 }

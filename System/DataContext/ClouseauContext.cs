@@ -24,7 +24,7 @@ public partial class ClouseauContext : DbContext
 
     public virtual DbSet<Applicant> Applicants { get; set; }
 
-    public virtual DbSet<ApplicantsPosition> ApplicantsPositions { get; set; }
+    public virtual DbSet<ApplicantPosition> ApplicantPositions { get; set; }
 
     public virtual DbSet<Client> Clients { get; set; }
 
@@ -116,9 +116,9 @@ public partial class ClouseauContext : DbContext
 
     public virtual DbSet<SystemConfig> SystemConfigs { get; set; }
 
-    public virtual DbSet<TaskProgress> TaskProgresses { get; set; }
+    public virtual DbSet<ProjectTaskProgress> TaskProgresses { get; set; }
 
-    public virtual DbSet<TaskType> TaskTypes { get; set; }
+    public virtual DbSet<ProjectTaskType> TaskTypes { get; set; }
 
     public virtual DbSet<Team> Teams { get; set; }
 
@@ -198,7 +198,7 @@ public partial class ClouseauContext : DbContext
                 .HasColumnName("other");
         });
 
-        modelBuilder.Entity<ApplicantsPosition>(entity =>
+        modelBuilder.Entity<ApplicantPosition>(entity =>
         {
             entity.ToTable("applicantsPositions");
 
@@ -1172,7 +1172,7 @@ public partial class ClouseauContext : DbContext
                 .HasColumnName("previousValue");
         });
 
-        modelBuilder.Entity<TaskProgress>(entity =>
+        modelBuilder.Entity<ProjectTaskProgress>(entity =>
         {
             entity.ToTable("TaskProgress");
 
@@ -1208,7 +1208,7 @@ public partial class ClouseauContext : DbContext
                 .HasConstraintName("FK_TaskProgress_Users");
         });
 
-        modelBuilder.Entity<TaskType>(entity =>
+        modelBuilder.Entity<ProjectTaskType>(entity =>
         {
             entity.Property(e => e.Description)
                 .HasMaxLength(250)

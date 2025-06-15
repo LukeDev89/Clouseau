@@ -16,9 +16,9 @@ namespace DataService.Services.Management
             _repository = repository;
         }
 
-        public async Task<List<TaskProgress>> GetAsync() => await _repository.GetAsync();
+        public async Task<List<ProjectTaskProgress>> GetAsync() => await _repository.GetAsync();
 
-        public async Task<List<TaskProgress>> GetByTaskIdAsync(long taskId) => await _repository.GetByTaskIdAsync(taskId);
+        public async Task<List<ProjectTaskProgress>> GetByTaskIdAsync(long taskId) => await _repository.GetByTaskIdAsync(taskId);
 
         public async Task AddAsync(List<TaskProgressRequest> request) => await _repository.AddAsync(request);
 

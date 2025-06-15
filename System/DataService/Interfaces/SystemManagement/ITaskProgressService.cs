@@ -7,13 +7,13 @@ namespace DataService.Interfaces.Management
 {
     public interface ITaskProgressService
     {
-        Task<List<TaskProgress>> GetAsync();
+        Task<List<ProjectTaskProgress>> GetAsync();
 
         Task AddAsync(List<TaskProgressRequest> request);
 
         Task EditAsync(List<TaskProgressRequest> request);
 
-        Task<List<TaskProgress>> GetByTaskIdAsync(long taskId);
+        Task<List<ProjectTaskProgress>> GetByTaskIdAsync(long taskId);
 
         Task DeletHourById(long id);
 

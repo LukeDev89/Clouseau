@@ -51,12 +51,12 @@ public partial class ProjectTask
         } 
     }
 
-    public virtual ICollection<TaskProgress> TaskProgresses { get; set; } = new List<TaskProgress>();
+    public virtual ICollection<ProjectTaskProgress> TaskProgresses { get; set; } = new List<ProjectTaskProgress>();
     public decimal Completed { get { return TaskProgresses.Count > 0 ? TaskProgresses.Sum(x => x.Hours) : 0; } }
 
     public decimal Progress { get { return EstimatedHours > 0 ? (Completed / EstimatedHours) : 0; } }
 
-    public virtual TaskType? TaskType { get; set; }
+    public virtual ProjectTaskType? TaskType { get; set; }
     public string TaskTypeName { get { return TaskType?.Name ?? ""; } }
 
     public virtual ICollection<ProjectTaskEstimation> ProjectTaskEstimations { get; set; } = new List<ProjectTaskEstimation>();

@@ -13,7 +13,7 @@ namespace DataContext.Repositories.ProjectManagement
         private User _user { get; set; } = new User();
         private List<UserNonworkingDay> _userLicence { get; set; } = new List<UserNonworkingDay>();
         private List<DateTime> _holidays { get; set; } = new List<DateTime>();
-        private List<TaskProgress> _progress { get; set; } = new List<TaskProgress>();
+        private List<ProjectTaskProgress> _progress { get; set; } = new List<ProjectTaskProgress>();
 
         public ProjectTaskRepository(IDbContextFactory<ClouseauContext> context)
         {
@@ -142,7 +142,7 @@ namespace DataContext.Repositories.ProjectManagement
             Task<User> userTask = null;
             Task<List<UserNonworkingDay>> userLicenceTask = null;
             Task<List<DateTime>> holidaysTask = null;
-            Task<List<TaskProgress>> progressTask = null;
+            Task<List<ProjectTaskProgress>> progressTask = null;
 
             if (force)
             {
@@ -283,7 +283,7 @@ namespace DataContext.Repositories.ProjectManagement
             Task<User> userTask = null;
             Task<List<UserNonworkingDay>> userLicenceTask = null;
             Task<List<DateTime>> holidaysTask = null;
-            Task<List<TaskProgress>> progressTask = null;
+            Task<List<ProjectTaskProgress>> progressTask = null;
 
             var context = _contextFactory.CreateDbContext();
 
@@ -375,7 +375,7 @@ namespace DataContext.Repositories.ProjectManagement
             Task<User> userTask = null;
             Task<List<UserNonworkingDay>> userLicenceTask = null;
             Task<List<DateTime>> holidaysTask = null;
-            Task<List<TaskProgress>> progressTask = null;
+            Task<List<ProjectTaskProgress>> progressTask = null;
 
             if (force)
             {
@@ -514,7 +514,7 @@ namespace DataContext.Repositories.ProjectManagement
             Task<User> userTask = null;
             Task<List<UserNonworkingDay>> userLicenceTask = null;
             Task<List<DateTime>> holidaysTask = null;
-            Task<List<TaskProgress>> progressTask = null;
+            Task<List<ProjectTaskProgress>> progressTask = null;
 
             var context = _contextFactory.CreateDbContext();
 

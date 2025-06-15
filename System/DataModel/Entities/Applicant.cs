@@ -19,5 +19,5 @@ public partial class Applicant
 
     public DateTime Created { get; set; }
 
-    public virtual ICollection<ApplicantsPosition> ApplicantsPositions { get; set; } = new List<ApplicantsPosition>();
+    public virtual ICollection<ApplicantPosition> ApplicantsPositions { get; set; } = new List<ApplicantPosition>();
 }
